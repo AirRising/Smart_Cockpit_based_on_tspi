@@ -1,0 +1,15 @@
+if(SMART_COCKPIT_USE_QT6)
+  find_package(Qt6 6.2 REQUIRED COMPONENTS Test)
+  set(QT_TEST_PKG "Qt6")
+else()
+  find_package(Qt5 5.12 REQUIRED COMPONENTS Test)
+  set(QT_TEST_PKG "Qt5")
+endif()
+
+add_executable(tst_canframeparser tst_canframeparser.cpp)
+target_link_libraries(tst_canframeparser PRIVATE smart_cockpit_core ${QT_TEST_PKG}::Test)
+add_test(NAME tst_canframeparser COMMAND tst_canframeparser)
+
+add_executable(tst_climateservice tst_climateservice.cpp)
+target_link_libraries(tst_climateservice PRIVATE smart_cockpit_core ${QT_TEST_PKG}::Test)
+add_test(NAME tst_climateservice COMMAND tst_climateservice)

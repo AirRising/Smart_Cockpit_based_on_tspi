@@ -1,0 +1,21 @@
+[Unit]
+Description=Smart Cockpit HMI (Qt Widgets, eglfs/KMS)
+After=network-online.target bluetooth.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Environment=QT_QPA_PLATFORM=eglfs
+Environment=QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+Environment=QT_QPA_EGLFS_KMS_CONFIG=/etc/smart-cockpit/kms-config.json
+Environment=GST_DEBUG=3
+Environment=SMART_COCKPIT_CAN=can0
+ExecStart=/usr/local/bin/smart-cockpit --can can0
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
