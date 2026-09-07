@@ -21,7 +21,6 @@ public:
 public slots:
     void setFrame(const QImage &frame);
     void setSteeringAngle(double degrees);
-    void setOverlayVisible(bool visible);
 
 protected:
     void initializeGL() override;
@@ -34,7 +33,6 @@ private:
     QImage m_frame;
     QMutex m_frameMutex;
     double m_steeringAngle = 0.0;
-    bool m_overlayVisible = true;
 };
 
 } // namespace sc

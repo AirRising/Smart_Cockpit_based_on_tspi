@@ -39,8 +39,8 @@ add_library(smart_cockpit_core STATIC
   src/core/CanManager.cpp
   src/core/CarService.cpp
   src/core/HealthMonitor.cpp
+  src/core/SignalSimulator.cpp
   src/logging/AsyncLogger.cpp
-  src/media/BlueZScanner.cpp
   src/media/MediaService.cpp
   src/camera/CameraService.cpp
   src/camera/VideoWidget.cpp

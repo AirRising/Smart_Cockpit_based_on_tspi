@@ -6,9 +6,9 @@
 
 namespace sc {
 
-// GStreamer playbin wrapper for local MP3 playback plus optional BlueZ A2DP
-// sink selection (bluealsa). GStreamer bus messages are drained by a 200 ms
-// QTimer instead of a GLib main loop, keeping the integration Qt-native.
+// GStreamer playbin wrapper for local MP3 playback over the ALSA sink.
+// GStreamer bus messages are drained by a 200 ms QTimer instead of a GLib
+// main loop, keeping the integration Qt-native.
 class MediaService : public QObject
 {
     Q_OBJECT
@@ -30,12 +30,6 @@ public:
     qint64 durationMs() const;
     QString currentTrack() const;
     bool healthy() const;
-
-    void setAudioSink(const QString &sinkDescription); // e.g. "alsasink", "bluealsa:..."
-    QString audioSink() const;
-
-    // Configure a connected A2DP device as output ("bluealsa:SRV=...,DEV=...") .
-    void setBluetoothDevice(const QString &deviceAddress);
 
 signals:
     void trackChanged(const QString &title);

@@ -54,13 +54,12 @@
 
 ### 主机调试环境（Ubuntu）
 
-开发时没有实车、没有真摄像头、没有真蓝牙，所以项目做了三个"替身"：
+开发时没有实车、没有真摄像头，所以项目做了两个"替身"：
 
 | 真车上 | 开发机上 |
 | --- | --- |
-| CAN 总线 `can0` | 虚拟 CAN `vcan0`（`scripts/vcan-setup.sh` 创建） |
+| CAN 总线 `can0` | 虚拟 CAN `vcan0`（`scripts/vcan-setup.sh` 创建），或干脆 `--sim` 内置模拟 |
 | 摄像头 OV5695 | `videotestsrc` 测试视频源（自带小球动画） |
-| 蓝牙 A2DP 音箱 | 随便一个 ALSA 声卡 |
 
 这就是"主机能跑、真机也能跑"的调试思路：**所有外设都被抽象成"服务"，主机上找不到就自动降级**。
 
@@ -164,12 +163,12 @@ tspi/
 │   │   ├── CanFrameParser.h/.cpp      # DBC 解析/编码
 │   │   ├── CanManager.h/.cpp          # CAN 接收线程
 │   │   ├── CarService.h/.cpp          # 车辆数据中枢
+│   │   ├── SignalSimulator.h/.cpp     # 内置信号模拟器（--sim，无需 CAN）
 │   │   └── HealthMonitor.h/.cpp       # 系统状态机
 │   ├── logging/
 │   │   └── AsyncLogger.h/.cpp         # 异步日志
 │   ├── media/
-│   │   ├── MediaService.h/.cpp        # GStreamer MP3 播放
-│   │   └── BlueZScanner.h/.cpp        # 蓝牙设备扫描（当前未在 main 中接线）
+│   │   └── MediaService.h/.cpp        # GStreamer MP3 播放
 │   ├── camera/
 │   │   ├── CameraService.h/.cpp       # GStreamer 摄像头取流 + NV12→RGBA
 │   │   └── VideoWidget.h/.cpp         # QOpenGLWidget 画面 + 轨迹线
@@ -194,7 +193,7 @@ tspi/
         ┌────────── ui/（只做显示和交互，不认识硬件）
         │    MainWindow, 4 个页面, 仪表控件, 全局主题
         ├────────── media/ camera/（外设封装，暴露信号/方法）
-        │    GStreamer 播放、摄像头、蓝牙
+        │    GStreamer 播放、摄像头
         ├────────── core/（业务中枢，不认识 UI）
         │    CanFrameParser, CanManager, CarService, HealthMonitor
         └────────── logging/（工具，谁都能用）
@@ -324,11 +323,14 @@ return app.exec();
 
 | 参数 | 作用 |
 | --- | --- |
-| `--can vcan0` | CAN 接口名 |
+| `--can vcan0` | CAN 接口名（不传 `--sim` 时使用） |
 | `--camera ""` | 摄像头设备路径，空 = 测试源 |
 | `--dbc file` | 用 DBC 文件覆盖内置信号表 |
 | `--log-dir dir` | 日志目录 |
 | `--media-dir dir` | 音乐目录 |
+| `--sim` | 用内置信号模拟器驱动整个 HMI，**不需要 CAN/vcan**（见下） |
+
+**信号模拟器（SignalSimulator）**：`--sim` 模式下程序不起 CAN socket，改由一个 100ms 定时器把合成的模拟帧喂给 `CarService::onCanFrame`，模拟"加速→巡航（带转向灯）→刹停→倒车→停车"的循环，并在仪表上实时可见（含每 40 秒闪一次发动机灯、每 25 秒短暂倒车展示影像）。在**内核没有 CAN 模块的板子上**（如出厂精简镜像缺 vcan），这是演示/开发 HMI 的最省事方式。此时 `CarService::setSimulatedMode(true)` 会让健康监控把 CAN 视为正常，避免误报"CAN 丢失"。
 
 ### 7.2 数据结构 —— CanTypes.h / SystemState.h
 
@@ -652,9 +654,7 @@ setPanelEnabled(false, "等待车辆确认...");
 
 **不用 GLib 主循环**：GStreamer 默认要在自己的 GLib 事件循环里跑，但项目是 Qt 程序，所以用一个 `QTimer` 定时 `gst_bus_pop_filtered()` 手动取消息，把 GLib 从 Qt 里"请出去"，两个事件循环不会打架。
 
-**MediaPage** 是文件列表（音乐库）+ 播放器卡（正在播放）：专辑占位块 + 曲名 + 进度滑杆 + 时间 + 圆形控制键（`▶` 青色主键 44px、`❚❚`、`■` 40px 次级键，全用 Unicode 字符）。播放目录来自环境变量 `SMART_COCKPIT_MEDIA_DIR` 或系统音乐目录。
-
-**BlueZScanner**：通过 D-Bus 连 BlueZ（Linux 蓝牙栈），用 ObjectManager 列出设备，设备连上时发 `deviceConnected` 信号，然后 `MediaService::setBluetoothDevice()` 把音频输出切到 `bluealsa` 的 A2DP 设备。**注意：当前 `main.cpp` 尚未实例化 `BlueZScanner`，蓝牙链路是"编译了但没接线"的预留功能**。
+**MediaPage** 是文件列表（音乐库）+ 播放器卡（正在播放）：专辑占位块 + 曲名 + 进度滑杆 + 时间 + 圆形控制键（`▶` 青色主键 44px、`❚❚`、`■` 40px 次级键，全用 Unicode 字符）。播放目录来自环境变量 `SMART_COCKPIT_MEDIA_DIR` 或系统音乐目录。音频输出固定走 ALSA（`alsasink`）。
 
 ### 7.14 CameraService + VideoWidget + ReverseCameraPage —— 倒车影像
 
@@ -725,14 +725,25 @@ cmake --preset Debug && cmake --build --preset Debug
 ctest --test-dir build --output-on-failure
 ```
 
-两个测试可执行文件：
+四个测试可执行文件（UI/页面测试用 `QT_QPA_PLATFORM=offscreen` 无头运行，不需要屏幕）：
 
 - **tst_canframeparser**：手搓 8 字节数据，验证解码出的 speed/rpm/fuel 对不对；再加载一段 DBC 文本验证覆盖逻辑；编码→解码回环；以及**截断帧被整帧拒绝**（数据过短时不静默解出 0）。
 - **tst_climateservice**：直接调 `CarService::onCanFrame` 注入带 ack 的 0x200 帧，验证 `climateAckOk` 触发、状态更新；不注入则等 600ms 超时验证回滚；以及 **DBC 覆盖缺字段时保持最后有效状态、不产生错误信号**。
+- **tst_screenmanager**：页面优先级抢占逻辑——正常切页、倒车(Urgent)抢占、倒车期间普通请求被拒、退出倒车回到原页面。
+- **tst_ui**：UI 冒烟测试——用真实 `CarService` 驱动 `InstrumentPage`/`ClimatePage`，断言 CAN 帧能让仪表值和挡位标签正确更新、空调"改滑杆→发指令→ack→刷新 UI"整条链路走通，并把每个页面离屏渲染成图、断言确实画出了内容（防"编译通过但页面画不出来"）。
 
 > 注意 Qt 5.15 的 `QSignalSpy::wait()` 只对"wait 期间新发生的信号"返回 true（信号早已发生会返回 false），所以对同步注入的测试要直接断言 `spy.count()`，别依赖 `wait()`。
 
-### 8.4 主机运行
+### 8.4 CI / 格式
+
+- **GitHub Actions**：`.github/workflows/ci.yml` 在每次 push / PR 时自动执行"装依赖 → 构建 → 跑全部测试"。推送到 GitHub 即生效。
+- **本地/云服务器跑同一套门禁**（不依赖 GitHub）：
+  ```bash
+  sudo ./scripts/ci.sh          # 自动 apt 装依赖 + 构建 + ctest
+  ```
+- **代码格式**：`.clang-format` 定义了统一风格；`./scripts/format.sh` 就地格式化，`./scripts/format.sh --check` 校验（CI 里作为不阻塞的信息性检查）。
+
+### 8.5 主机运行
 
 ```bash
 # 创建虚拟 CAN
@@ -745,6 +756,14 @@ ctest --test-dir build --output-on-failure
 ```
 
 效果：`demo-can.sh` 发的 0x100 帧会让仪表显示 120km/h / 3000rpm / 50% 电量 + 左转向灯亮；0x300 帧会让屏幕切到"倒车全屏"（测试小球画面 + 轨迹线）；按 F1/F2/F3 切换页面。
+
+**没有 CAN/vcan 也能看效果**（例如板子内核缺 vcan 模块、或只想快速演示）：
+
+```bash
+./build/smart-cockpit --sim
+```
+
+会自动跑"加速→巡航→刹停→倒车→停车"循环并驱动仪表/挡位/倒车画面。
 
 > 离屏截图验证 UI：用 `QT_QPA_PLATFORM=offscreen` 跑一个临时程序，创建服务 + 页面后 `widget->grab()` 存 PNG（本仓库不包含此工具，属调试技巧）。
 
@@ -779,7 +798,7 @@ cmake --build --preset Cross -j$(nproc)
 
 脚本用 rsync 传二进制 + systemd 单元 + KMS 配置，然后 `systemctl enable/restart`。systemd 单元里设了 `QT_QPA_PLATFORM=eglfs` 等环境变量。
 
-设备侧要装：`libqt5widgets5 libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good bluez bluealsa systemd fonts-noto-cjk`（**`fonts-noto-cjk` 必须有**，否则中文显示为方块），以及 eglfs 平台插件。
+设备侧要装：`libqt5widgets5 libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good systemd fonts-noto-cjk`（**`fonts-noto-cjk` 必须有**，否则中文显示为方块），以及 eglfs 平台插件。
 
 ---
 
@@ -801,7 +820,8 @@ cmake --build --preset Cross -j$(nproc)
 | 温度圆表太小 / 被裁切 | 表盘按 `min(w,h)` 取居中正方形，`sizeHint()` 返回 400×400。注意：加 `Qt::AlignCenter` 对齐标志会阻止控件拉伸、锁死在最小尺寸（见 7.12） |
 | 媒体页曲库是空的 | 本机音乐目录没有 mp3/flac/wav/ogg。用 `--media-dir 你的目录` 指定，或往 `~/Music` 放两个文件 |
 | 某些图标显示成方块 □ | Unicode 字符（◉❄▶♪）在极老字体下缺字形，装 `fonts-noto-core`；项目本身不依赖任何图片资源 |
-| 系统状态误报 Emergency | 只会在 CAN 连接且 3 秒无新帧、或从未连上时出现；确认总线在发周期帧 |
+| 系统状态误报 Emergency | 只会在 CAN 连接且 3 秒无新帧、或从未连上时出现；确认总线在发周期帧，或改用 `--sim` 模式（模拟数据源会把 CAN 视为正常） |
+| 板子内核没有 CAN/vcan，HMI 怎么演示 | 用 `./smart-cockpit --sim`：内置信号模拟器直接驱动仪表/挡位/倒车，不依赖任何 CAN 硬件或内核模块 |
 | 鼠标键盘没反应 | eglfs 默认没输入，调试时用 `QT_QPA_PLATFORM=linuxfb` 或 x11 后端跑 |
 
 ---
@@ -854,8 +874,8 @@ cmake --build --preset Cross -j$(nproc)
 | `GaugeWidget` | 用 QPainter 画的圆表（辉光值弧 + 红区 + 锥形指针） |
 | `InstrumentPage` | 车速 / 电机转速 / 电量三张卡片 + 挡位 + 指示灯 |
 | `ClimatePage` | 温度圆表 + 风量进度条 + 吹风/循环模式 + "发指令→等确认→超时回滚" |
-| `MediaService` | GStreamer 播放器封装 |
-| `BlueZScanner` | D-Bus 蓝牙扫描（预留，未接线） |
+| `MediaService` | GStreamer 播放器封装（ALSA 输出） |
+| `SignalSimulator` | 内置信号源（`--sim`），无需 CAN/vcan 就能驱动整个 HMI |
 | `CameraService` | appsink 取流 + NV12 转 RGBA |
 | `VideoWidget` | OpenGL 画面 + QPainter 轨迹线 |
 | `AsyncLogger` | 队列写日志，不卡 UI |

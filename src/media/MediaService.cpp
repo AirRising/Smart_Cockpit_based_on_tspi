@@ -103,26 +103,6 @@ qint64 MediaService::durationMs() const { return m_durationMs; }
 QString MediaService::currentTrack() const { return m_currentTrack; }
 bool MediaService::healthy() const { return m_healthy; }
 
-void MediaService::setAudioSink(const QString &sinkDescription)
-{
-    m_audioSink = sinkDescription;
-}
-
-QString MediaService::audioSink() const
-{
-    return m_audioSink;
-}
-
-void MediaService::setBluetoothDevice(const QString &deviceAddress)
-{
-    // bluealsa exposes an ALSA device per A2DP sink; we wrap it in alsasink:
-    //   alsasink device="bluealsa:SRV=org.bluealsa,DEV=AA:BB:CC:DD:EE:FF,PROFILE=a2dp"
-    setAudioSink(QStringLiteral(
-                     "alsasink device=\"bluealsa:SRV=org.bluealsa,DEV=%1,PROFILE=a2dp\"")
-                     .arg(deviceAddress));
-    qInfo() << "A2DP audio sink set for" << deviceAddress;
-}
-
 void MediaService::pollBus()
 {
     if (!m_bus)

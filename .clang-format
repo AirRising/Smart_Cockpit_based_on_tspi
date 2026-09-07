@@ -1,0 +1,43 @@
+# clang-format configuration matching the project's Qt/Allman style.
+#
+# Apply with:   ./scripts/format.sh          (format in place)
+# Verify with:  ./scripts/format.sh --check  (exit 1 on drift)
+#
+# Based on the existing code layout:
+#   - 4-space indent, no tabs, 100 column limit
+#   - functions: brace on its own line (Allman)
+#   - control statements (if/for/while): brace on the same line
+#   - namespaces not indented; "public:/private:" aligned with the class
+
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+PointerAlignment: Left
+ReferenceAlignment: Pointer
+NamespaceIndentation: None
+AccessModifierOffset: -4
+SortIncludes: CaseSensitive
+IncludeBlocks: Preserve
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: true
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false

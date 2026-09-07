@@ -9,6 +9,7 @@
 #include "HealthMonitor.h"
 #include "MainWindow.h"
 #include "MediaService.h"
+#include "SignalSimulator.h"
 #include "SystemState.h"
 #include "Theme.h"
 
@@ -40,11 +41,15 @@ int main(int argc, char *argv[])
     QCommandLineOption mediaOption(QStringLiteral("media-dir"),
                                    QStringLiteral("Media directory"),
                                    QStringLiteral("dir"), QString());
+    QCommandLineOption simOption(QStringLiteral("sim"),
+                                 QStringLiteral("Drive the UI from a built-in signal "
+                                                "simulator (no CAN bus / vcan needed)"));
     parser.addOption(canOption);
     parser.addOption(cameraOption);
     parser.addOption(dbcOption);
     parser.addOption(logOption);
     parser.addOption(mediaOption);
+    parser.addOption(simOption);
     parser.process(app);
 
     sc::AsyncLogger::instance().start(parser.value(logOption));
@@ -75,13 +80,28 @@ int main(int argc, char *argv[])
                      &window, &sc::MainWindow::onDiagnostics);
     window.showFullScreen();
 
+    // Built-in signal simulator: drive the whole HMI with synthetic frames, no
+    // CAN socket or vcan needed (useful on boards whose kernel lacks CAN).
+    sc::SignalSimulator *simulator = nullptr;
+    if (parser.isSet(simOption)) {
+        car.setSimulatedMode(true);
+        simulator = new sc::SignalSimulator(&car);
+        simulator->start();
+        qInfo() << "Running in built-in signal simulation mode (--sim)";
+    }
+
     media.init();
-    car.start(parser.value(canOption));
+    if (!parser.isSet(simOption))
+        car.start(parser.value(canOption));
     camera.start(parser.value(cameraOption));
     health.start();
 
     const int exitCode = app.exec();
     health.stop();
+    if (simulator) {
+        simulator->stop();
+        delete simulator;
+    }
     car.stop();
     camera.stop();
     media.shutdown();

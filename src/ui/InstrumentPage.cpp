@@ -39,14 +39,17 @@ InstrumentPage::InstrumentPage(CarService *car, QWidget *parent)
     setStyleSheet(QStringLiteral("#instrumentPage { background: transparent; }"));
 
     m_speedGauge = new GaugeWidget(this);
+    m_speedGauge->setObjectName(QStringLiteral("speedGauge"));
     m_speedGauge->configure(0, 240, QStringLiteral("km/h"), 200, 12);
     m_speedGauge->setLabel(QStringLiteral("车速"));
 
     m_rpmGauge = new GaugeWidget(this);
+    m_rpmGauge->setObjectName(QStringLiteral("rpmGauge"));
     m_rpmGauge->configure(0, 8000, QStringLiteral("rpm"), 6000, 8);
     m_rpmGauge->setLabel(QStringLiteral("电机转速"));
 
     m_fuelGauge = new GaugeWidget(this);
+    m_fuelGauge->setObjectName(QStringLiteral("fuelGauge"));
     m_fuelGauge->configure(0, 100, QStringLiteral("%"), 15, 10, 0);
     m_fuelGauge->setLabel(QStringLiteral("电量"));
     m_fuelGauge->setFixedSize(150, 150);

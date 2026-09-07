@@ -26,12 +26,6 @@ void VideoWidget::setSteeringAngle(double degrees)
     update();
 }
 
-void VideoWidget::setOverlayVisible(bool visible)
-{
-    m_overlayVisible = visible;
-    update();
-}
-
 void VideoWidget::initializeGL()
 {
     initializeOpenGLFunctions();
@@ -68,8 +62,7 @@ void VideoWidget::paintGL()
         painter.drawText(rect(), Qt::AlignCenter, tr("NO SIGNAL"));
     }
 
-    if (m_overlayVisible)
-        drawTrajectory(painter);
+    drawTrajectory(painter);
 }
 
 void VideoWidget::drawTrajectory(QPainter &painter)

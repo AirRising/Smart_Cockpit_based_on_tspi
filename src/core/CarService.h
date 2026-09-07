@@ -34,6 +34,11 @@ public:
     qint64 lastFrameTimeMs() const;
     CanFrameParser *parser();
 
+    // Built-in synthetic signal source (see SignalSimulator). In this mode the
+    // HMI is driven without a real CAN socket, so the health monitor must not
+    // treat the missing bus as an Emergency.
+    void setSimulatedMode(bool on);
+
     // Instrument state (0x100).
     double speed() const;
     int rpm() const;
@@ -90,6 +95,7 @@ private:
 
     qint64 m_lastFrameTimeMs = 0;
     bool m_canConnected = false;
+    bool m_simulated = false;
 
     // 0x100
     double m_speed = 0.0;

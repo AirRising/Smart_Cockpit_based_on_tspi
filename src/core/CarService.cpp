@@ -68,7 +68,14 @@ void CarService::stop()
 
 bool CarService::canConnected() const
 {
+    if (m_simulated)
+        return true;
     return m_canConnected && m_can && m_can->isOpen();
+}
+
+void CarService::setSimulatedMode(bool on)
+{
+    m_simulated = on;
 }
 
 quint64 CarService::framesReceived() const
