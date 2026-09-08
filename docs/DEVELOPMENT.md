@@ -673,7 +673,7 @@ setPanelEnabled(false, "等待车辆确认...");
 
 > 说明：摄像头在 `main.cpp` 里随开机无条件 `start()`，倒车时才切到倒车页显示画面。保持常开换来了"挂 R 档立刻出画面"的可靠性，代价是持续占用少量 CPU/功耗——这是有意的取舍。
 
-**VideoWidget**：继承 `QOpenGLWidget`，但**没用任何 OpenGL 着色器**——它只是借用 OpenGL 的纹理上传把 `QImage` 高效画到屏幕上，再用 `QPainter` 在 GL 表面上面叠加轨迹线。要点：
+**VideoWidget**：运行时在 OpenGL 与软件两种后端间二选一（`VideoWidget::supportsOpenGL()` 探测当前平台能否创建 GL 上下文）。有 GL 的平台（RK3566 eglfs/KMS、桌面 GPU）走 `QOpenGLWidget`，**没用任何 OpenGL 着色器**——只是借用 OpenGL 的纹理上传把 `QImage` 高效画到屏幕，再用 `QPainter` 在 GL 表面叠加轨迹线；无 GL 的平台（Qt6 的 `offscreen`/`minimal` 插件、无头 CI）自动退化为纯 QPainter 软件渲染，避免 Qt6 在暴露 `QOpenGLWidget` 时于 backing-store RHI flush 处崩溃。两套后端共用同一份"画面 + 轨迹线"绘制代码，观感一致。要点：
 1. **画面缩放**（`paintGL`）：`drawImage` 到按宽高比算出的目标矩形，保持画面不变形。
 2. **线程安全**：`setFrame` 可能从任意时刻被调用，存取 `m_frame` 都用 `QMutex` 保护。
 3. **轨迹线**（`drawTrajectory`）：根据方向盘角度算两条贝塞尔曲线，`shift = steerNorm * w * 0.18`（`steerNorm = 角度/450`），打得越狠偏移越大——模拟"车要往哪拐"。
@@ -694,15 +694,19 @@ setPanelEnabled(false, "等待车辆确认...");
 
 ## 8. 构建、测试、运行
 
-### 8.1 安装依赖（Ubuntu）
+### 8.1 安装依赖（Ubuntu 22.04+，Qt6 默认）
 
 ```bash
-sudo apt install build-essential cmake qtbase5-dev qtbase5-dev-tools \
-     libqt5dbus5 libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+sudo apt install build-essential cmake qt6-base-dev qt6-base-dev-tools \
+     libqt6test6 libqt6openglwidgets6 libgl1-mesa-dev \
+     libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
      gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
      gstreamer1.0-plugins-ugly gstreamer1.0-libav \
-     libgstreamer-plugins-base1.0-dev libqt5test5 can-utils
+     libgstreamer-plugins-base1.0-dev can-utils
 ```
+
+> Qt5 已降级为 legacy 可选项：装 `qtbase5-dev` 系列后配置时加
+> `-DSMART_COCKPIT_USE_QT6=OFF` 即可。
 
 ### 8.2 构建
 
@@ -781,12 +785,13 @@ ctest --test-dir build --output-on-failure
 
 ```bash
 export SDK_SYSROOT=/opt/taisanpi/sysroot
-export SDK_QT_ROOT=/opt/taisanpi/qt5      # 可选
+export SDK_QT_ROOT=/opt/taisanpi/qt6      # 可选；Qt5 sysroot 时指向 qt5 且加开关
 cmake --preset Cross
 cmake --build --preset Cross -j$(nproc)
 ```
 
-等价命令：`cmake -B build-arm -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux-gnu.cmake -DSMART_COCKPIT_USE_QT6=OFF`。
+默认按 Qt6 交叉编译（`SMART_COCKPIT_USE_QT6` 默认 ON）。等价的 Qt5 legacy 命令：
+`cmake -B build-arm -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux-gnu.cmake -DSMART_COCKPIT_USE_QT6=OFF`。
 
 工具链文件的关键设置：`CMAKE_SYSROOT` 指向 rootfs，`CMAKE_FIND_ROOT_PATH_MODE_*` 设为 `ONLY`（只从 sysroot 找依赖，不会混入主机库），`PKG_CONFIG_LIBDIR` 指向 aarch64 的 pkgconfig。
 
@@ -798,7 +803,7 @@ cmake --build --preset Cross -j$(nproc)
 
 脚本用 rsync 传二进制 + systemd 单元 + KMS 配置，然后 `systemctl enable/restart`。systemd 单元里设了 `QT_QPA_PLATFORM=eglfs` 等环境变量。
 
-设备侧要装：`libqt5widgets5 libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good systemd fonts-noto-cjk`（**`fonts-noto-cjk` 必须有**，否则中文显示为方块），以及 eglfs 平台插件。
+设备侧要装（Qt6）：`libqt6widgets6 libqt6openglwidgets6 libqt6dbus6 libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good systemd fonts-noto-cjk`（**`fonts-noto-cjk` 必须有**，否则中文显示为方块），以及 `libqt6gui6` 的 eglfs 平台插件。设备仍为 Qt5 时对应装 `libqt5widgets5 libqt5gui5` 系列。
 
 ---
 

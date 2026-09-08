@@ -13,7 +13,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 option(BUILD_TESTING "Build unit tests" ON)
-option(SMART_COCKPIT_USE_QT6 "Build against Qt6 instead of Qt5" OFF)
+option(SMART_COCKPIT_USE_QT6 "Build against Qt6 instead of Qt5 (legacy opt-in)" ON)
 
 # ---------------------------------------------------------------------------
 # Dependencies
@@ -23,10 +23,14 @@ pkg_check_modules(GST REQUIRED IMPORTED_TARGET gstreamer-1.0 gstreamer-app-1.0 g
 
 if(SMART_COCKPIT_USE_QT6)
   set(QT_PKG "Qt6")
-  find_package(Qt6 6.2 REQUIRED COMPONENTS Widgets DBus)
+  # QOpenGLWidget moved out of QtWidgets into the dedicated
+  # QtOpenGLWidgets module in Qt6.
+  find_package(Qt6 6.2 REQUIRED COMPONENTS Widgets DBus OpenGLWidgets)
+  set(QT_EXTRA_LIBS ${QT_PKG}::OpenGLWidgets)
 else()
   set(QT_PKG "Qt5")
   find_package(Qt5 5.12 REQUIRED COMPONENTS Widgets DBus)
+  set(QT_EXTRA_LIBS "")
 endif()
 
 find_package(Threads REQUIRED)
@@ -66,6 +70,7 @@ target_include_directories(smart_cockpit_core PUBLIC
 target_link_libraries(smart_cockpit_core PUBLIC
   ${QT_PKG}::Widgets
   ${QT_PKG}::DBus
+  ${QT_EXTRA_LIBS}
   PkgConfig::GST
   Threads::Threads
 )

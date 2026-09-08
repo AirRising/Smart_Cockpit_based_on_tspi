@@ -6,12 +6,14 @@
 #include <QSlider>
 #include <QWidget>
 
+#include "CameraService.h"
 #include "CarService.h"
 #include "ClimatePage.h"
 #include "GaugeWidget.h"
 #include "InstrumentPage.h"
 #include "MediaPage.h"
 #include "MediaService.h"
+#include "ReverseCameraPage.h"
 #include "SignalSimulator.h"
 
 using namespace sc;
@@ -64,6 +66,7 @@ private slots:
     void climateRoundTripThroughUi();
     void simulatorDrivesInstrument();
     void pagesRenderSomething();
+    void reversePageRendersSomething();
 };
 
 void TestUiSmoke::initTestCase()
@@ -169,6 +172,17 @@ void TestUiSmoke::pagesRenderSomething()
 
     MediaPage mediaPage(&media);
     QVERIFY(paintsContent(mediaPage));
+}
+
+// The reverse page hosts a QOpenGLWidget on GL-capable platforms. Headless
+// (Qt6 "offscreen") runs must fall back to the software renderer instead of
+// crashing inside Qt's backing-store RHI flush.
+void TestUiSmoke::reversePageRendersSomething()
+{
+    CarService car;
+    CameraService camera;
+    ReverseCameraPage page(&camera, &car);
+    QVERIFY(paintsContent(page));
 }
 
 QTEST_MAIN(TestUiSmoke)

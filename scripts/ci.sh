@@ -7,6 +7,9 @@
 # Usage:
 #   sudo ./scripts/ci.sh            # root or sudo
 #   sudo ./scripts/ci.sh build/ci   # optional custom build dir
+#
+# Builds against Qt6 (the project default). For a legacy Qt5 gate, install the
+# qtbase5-dev equivalents and configure with -DSMART_COCKPIT_USE_QT6=OFF.
 set -euo pipefail
 
 BUILD_DIR="${1:-build/ci}"
@@ -20,12 +23,14 @@ echo ">>> Installing build dependencies..."
 apt-get update
 apt-get install -y --no-install-recommends \
   build-essential cmake pkg-config \
-  qtbase5-dev qtbase5-dev-tools libqt5dbus5 libqt5test5 \
+  qt6-base-dev qt6-base-dev-tools libqt6test6 libqt6openglwidgets6 \
+  libgl1-mesa-dev \
   libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good
 
 echo ">>> Configuring (${BUILD_DIR})..."
-cmake -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+cmake -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON \
+  -DSMART_COCKPIT_USE_QT6=ON
 
 echo ">>> Building..."
 cmake --build "${BUILD_DIR}" -j"$(nproc)"

@@ -12,7 +12,7 @@ C++ + Qt Widgets，**不使用 QML**；界面已中文化（面向国产新能�
 | 数字仪表 | 车速 0-240 km/h、电机转速 0-8000 rpm、电量 0-100%、转向灯（左/右/双闪）、故障灯（电机/ABS/气囊），数据来自 CAN 0x100 |
 | 中控多媒体 | GStreamer `playbin` 播放本地 MP3/FLAC，输出到 ALSA |
 | 空调面板 | 自绘温度圆表 16-30℃、风量 0-7、吹风模式、内/外循环、AC 制冷/自动；双向 CAN 0x200，等待车辆回传 ACK，超时回滚 UI |
-| 倒车影像 | R 挡（CAN 0x300 bit0）全屏显示，GStreamer appsink 拉取 NV12 流转 RGBA，QOpenGLWidget 渲染，叠加随方向盘角度变化的轨迹线 |
+| 倒车影像 | R 挡（CAN 0x300 bit0）全屏显示，GStreamer appsink 拉取 NV12 流转 RGBA，QOpenGLWidget 渲染（无 GL 平台自动退化软件渲染），叠加随方向盘角度变化的轨迹线 |
 | CAN 通信 | SocketCAN（vcan0/can0），按 DBC 解析 0x100/0x200/0x300/0x400，内置默认信号表，也可加载 .dbc |
 | 信号模拟 | `--sim` 内置合成信号源，**无需 CAN/vcan** 即可演示整个 HMI（板子内核无 CAN 模块时可用） |
 | 系统状态机 | Normal / Degraded / Emergency，HealthMonitor 轮询各服务，驱动顶栏状态胶囊（绿/橙/红） |
@@ -51,7 +51,7 @@ tspi/
 │   │   └── MediaService.h/.cpp  # GStreamer playbin 封装（ALSA 输出）
 │   ├── camera/
 │   │   ├── CameraService.h/.cpp # appsink NV12 -> RGBA
-│   │   └── VideoWidget.h/.cpp   # QOpenGLWidget + 动态轨迹线
+│   │   └── VideoWidget.h/.cpp   # GL 倒车画面（无 GL 自动软件渲染）+ 轨迹线
 │   └── ui/
 │       ├── MainWindow.h/.cpp    # 顶栏 + QStackedWidget + 底部导航
 │       ├── ScreenManager.h/.cpp # 优先级页面管理
@@ -69,17 +69,22 @@ tspi/
     └── tst_ui.cpp               # UI 冒烟测试（offscreen）
 ```
 
-## 主机调试（Ubuntu 20.04）
+## 主机调试（Qt6 默认，Ubuntu 22.04+）
 
 依赖：
 
 ```bash
-sudo apt install build-essential cmake qtbase5-dev qtbase5-dev-tools \
-     libqt5dbus5 libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+sudo apt install build-essential cmake qt6-base-dev qt6-base-dev-tools \
+     libqt6test6 libqt6openglwidgets6 libgl1-mesa-dev \
+     libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
      gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
      gstreamer1.0-plugins-ugly gstreamer1.0-libav \
-     libgstreamer-plugins-base1.0-dev libqt5test5 can-utils
+     libgstreamer-plugins-base1.0-dev can-utils
 ```
+
+> Qt5 已被移为 legacy 可选项：安装 `qtbase5-dev qtbase5-dev-tools` 等
+> qtbase5 系列包后，用 `-DSMART_COCKPIT_USE_QT6=OFF` 配置即可（CI/脚本默认
+> 均按 Qt6 跑）。
 
 构建并运行：
 
@@ -107,15 +112,15 @@ CAN/vcan 模块时也能直接演示 HMI**（健康监控会自动把 CAN 视为
 
 准备 sysroot（把泰山派 Debian rootfs 放到 `$SDK_SYSROOT`，内含
 `usr/lib/aarch64-linux-gnu/pkgconfig` 等），并安装
-`g++-aarch64-linux-gnu`：
+`g++-aarch64-linux-gnu`。默认按 Qt6 交叉编译；若 sysroot 内仍是 Qt5，
+显式加 `-DSMART_COCKPIT_USE_QT6=OFF`：
 
 ```bash
 export SDK_SYSROOT=/opt/taisanpi/sysroot
 export SDK_QT_ROOT=/opt/taisanpi/qt5        # 可选：Qt 不在 sysroot 中时
 cmake -B build-arm \
       -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-aarch64-linux-gnu.cmake \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DSMART_COCKPIT_USE_QT6=OFF
+      -DCMAKE_BUILD_TYPE=Release
 cmake --build build-arm -j$(nproc)
 ```
 
@@ -125,10 +130,12 @@ cmake --build build-arm -j$(nproc)
 ./deployment/deploy.sh root@192.168.1.100 build-arm/smart-cockpit
 ```
 
-设备侧依赖：`libqt5widgets5 libgstreamer1.0-0 gstreamer1.0-plugins-base
-gstreamer1.0-plugins-good fonts-noto-cjk systemd`，以及 `libqt5gui5` 的 eglfs
+设备侧依赖（Qt6）：`libqt6widgets6 libqt6openglwidgets6 libqt6dbus6
+libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+fonts-noto-cjk systemd`，以及 `libqt6gui6` 的 eglfs
 平台插件（**`fonts-noto-cjk` 必须有，否则中文显示为方块**）。R 挡触发依赖 CAN
-0x300 的 bit0；无 CAN/vcan 时用 `--sim` 演示。
+0x300 的 bit0；无 CAN/vcan 时用 `--sim` 演示。若设备仍是 Qt5，对应安装
+`libqt5widgets5 libqt5gui5` 系列并在交叉编译时加 `-DSMART_COCKPIT_USE_QT6=OFF`。
 
 ## 多线程与信号/槽连接
 
