@@ -1,0 +1,61 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "Debug",
+      "displayName": "Debug (host)",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "Release",
+      "displayName": "Release (host)",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "Cross",
+      "displayName": "RK3566 cross (aarch64)",
+      "binaryDir": "${sourceDir}/build/arm",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "OFF",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-aarch64-linux-gnu.cmake"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "Debug",
+      "configurePreset": "Debug"
+    },
+    {
+      "name": "Release",
+      "configurePreset": "Release"
+    },
+    {
+      "name": "Cross",
+      "configurePreset": "Cross"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "Debug",
+      "configurePreset": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
