@@ -1,0 +1,133 @@
+Start testing: Sep 14 18:33 CST
+----------------------------------------------------------
+1/5 Testing: tst_canframeparser
+1/5 Test: tst_canframeparser
+Command: "/home/air/qt/Smart_Cockpit_based_on_tspi/build/tests/tst_canframeparser"
+Directory: /home/air/qt/Smart_Cockpit_based_on_tspi/build/tests
+"tst_canframeparser" start time: Sep 14 18:33 CST
+Output:
+----------------------------------------------------------
+********* Start testing of TestCanFrameParser *********
+Config: Using QtTest library 5.15.13, Qt 5.15.13 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : TestCanFrameParser::initTestCase()
+PASS   : TestCanFrameParser::decodeFrame100()
+PASS   : TestCanFrameParser::decodeFrame300Reverse()
+PASS   : TestCanFrameParser::truncatedFrameRejected()
+PASS   : TestCanFrameParser::loadDbcText()
+PASS   : TestCanFrameParser::encodeFrame200()
+PASS   : TestCanFrameParser::cleanupTestCase()
+Totals: 7 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+********* Finished testing of TestCanFrameParser *********
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"tst_canframeparser" end time: Sep 14 18:33 CST
+"tst_canframeparser" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/5 Testing: tst_climateservice
+2/5 Test: tst_climateservice
+Command: "/home/air/qt/Smart_Cockpit_based_on_tspi/build/tests/tst_climateservice"
+Directory: /home/air/qt/Smart_Cockpit_based_on_tspi/build/tests
+"tst_climateservice" start time: Sep 14 18:33 CST
+Output:
+----------------------------------------------------------
+********* Start testing of TestClimateService *********
+Config: Using QtTest library 5.15.13, Qt 5.15.13 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : TestClimateService::initTestCase()
+QWARN  : TestClimateService::ackConfirmsCommand() CAN not open - climate command not sent (simulation/test mode)
+QINFO  : TestClimateService::ackConfirmsCommand() Climate command 1 sent: 24 C fan 5 ac true auto false
+QINFO  : TestClimateService::ackConfirmsCommand() Climate ack OK: 24 C fan 5
+PASS   : TestClimateService::ackConfirmsCommand()
+QWARN  : TestClimateService::timeoutRollsBack() CAN not open - climate command not sent (simulation/test mode)
+QINFO  : TestClimateService::timeoutRollsBack() Climate command 1 sent: 28 C fan 3 ac true auto false
+QWARN  : TestClimateService::timeoutRollsBack() Climate command 1 timed out, rolling back to 22 C fan 3
+PASS   : TestClimateService::timeoutRollsBack()
+PASS   : TestClimateService::partialDbcKeepsLastKnownGood()
+PASS   : TestClimateService::cleanupTestCase()
+Totals: 5 passed, 0 failed, 0 skipped, 0 blacklisted, 632ms
+********* Finished testing of TestClimateService *********
+<end of output>
+Test time =   0.69 sec
+----------------------------------------------------------
+Test Passed.
+"tst_climateservice" end time: Sep 14 18:33 CST
+"tst_climateservice" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/5 Testing: tst_screenmanager
+3/5 Test: tst_screenmanager
+Command: "/home/air/qt/Smart_Cockpit_based_on_tspi/build/tests/tst_screenmanager"
+Directory: /home/air/qt/Smart_Cockpit_based_on_tspi/build/tests
+"tst_screenmanager" start time: Sep 14 18:33 CST
+Output:
+----------------------------------------------------------
+********* Start testing of TestScreenManager *********
+Config: Using QtTest library 5.15.13, Qt 5.15.13 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : TestScreenManager::initTestCase()
+PASS   : TestScreenManager::navSwitchesNormally()
+PASS   : TestScreenManager::urgentPreemptsAndBlocksLower()
+PASS   : TestScreenManager::dismissReturnsToPrevious()
+PASS   : TestScreenManager::cleanupTestCase()
+Totals: 5 passed, 0 failed, 0 skipped, 0 blacklisted, 9ms
+********* Finished testing of TestScreenManager *********
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"tst_screenmanager" end time: Sep 14 18:33 CST
+"tst_screenmanager" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/5 Testing: tst_ui
+4/5 Test: tst_ui
+Command: "/home/air/qt/Smart_Cockpit_based_on_tspi/build/tests/tst_ui"
+Directory: /home/air/qt/Smart_Cockpit_based_on_tspi/build/tests
+"tst_ui" start time: Sep 14 18:33 CST
+Output:
+----------------------------------------------------------
+********* Start testing of TestUiSmoke *********
+Config: Using QtTest library 5.15.13, Qt 5.15.13 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : TestUiSmoke::initTestCase()
+QWARN  : TestUiSmoke::instrumentGaugesFollowCanFrames() This plugin does not support propagateSizeHints()
+PASS   : TestUiSmoke::instrumentGaugesFollowCanFrames()
+QWARN  : TestUiSmoke::climateRoundTripThroughUi() This plugin does not support propagateSizeHints()
+QWARN  : TestUiSmoke::climateRoundTripThroughUi() CAN not open - climate command not sent (simulation/test mode)
+QINFO  : TestUiSmoke::climateRoundTripThroughUi() Climate command 1 sent: 24 C fan 3 ac true auto false
+QINFO  : TestUiSmoke::climateRoundTripThroughUi() Climate ack OK: 24 C fan 3
+PASS   : TestUiSmoke::climateRoundTripThroughUi()
+QWARN  : TestUiSmoke::simulatorDrivesInstrument() This plugin does not support propagateSizeHints()
+PASS   : TestUiSmoke::simulatorDrivesInstrument()
+QWARN  : TestUiSmoke::pagesRenderSomething() This plugin does not support propagateSizeHints()
+QWARN  : TestUiSmoke::pagesRenderSomething() This plugin does not support propagateSizeHints()
+QWARN  : TestUiSmoke::pagesRenderSomething() This plugin does not support propagateSizeHints()
+PASS   : TestUiSmoke::pagesRenderSomething()
+PASS   : TestUiSmoke::cleanupTestCase()
+Totals: 6 passed, 0 failed, 0 skipped, 0 blacklisted, 597ms
+********* Finished testing of TestUiSmoke *********
+<end of output>
+Test time =   0.62 sec
+----------------------------------------------------------
+Test Passed.
+"tst_ui" end time: Sep 14 18:33 CST
+"tst_ui" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/5 Testing: tst_core_cxx
+5/5 Test: tst_core_cxx
+Command: "/home/air/qt/Smart_Cockpit_based_on_tspi/build/tests/tst_core_cxx"
+Directory: /home/air/qt/Smart_Cockpit_based_on_tspi/build/tests
+"tst_core_cxx" start time: Sep 14 18:33 CST
+Output:
+----------------------------------------------------------
+all core (Qt-free) checks passed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"tst_core_cxx" end time: Sep 14 18:33 CST
+"tst_core_cxx" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Sep 14 18:33 CST

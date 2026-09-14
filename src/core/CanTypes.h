@@ -1,12 +1,16 @@
 #pragma once
 
-#include <QString>
+#include <cstdint>
+#include <string>
+
+// Pure C++ (standard library only) CAN data types. This header must stay free
+// of Qt so the parsing core can be built and unit-tested without Qt.
 
 namespace sc {
 
 // One DBC signal definition.
 struct CanSignalDef {
-    QString name;
+    std::string name;
     int startBit = 0;       // DBC start bit (Intel: LSB index, Motorola: MSB index)
     int bitLength = 1;
     bool bigEndian = false; // true = Motorola (SAE J1939 style), false = Intel
@@ -15,15 +19,15 @@ struct CanSignalDef {
     double offset = 0.0;
     double minVal = 0.0;
     double maxVal = 0.0;
-    QString unit;
+    std::string unit;
 };
 
 // Standard frame ids used by the cluster.
 namespace FrameId {
-constexpr quint32 ICU_Dynamic   = 0x100; // speed/rpm/fuel/indicators/mil
-constexpr quint32 HVAC          = 0x200; // climate command + echo/ack
-constexpr quint32 Gear          = 0x300; // gear_signal (bit0 = R engaged)
-constexpr quint32 Chassis       = 0x400; // steering angle
+constexpr std::uint32_t ICU_Dynamic   = 0x100; // speed/rpm/fuel/indicators/mil
+constexpr std::uint32_t HVAC          = 0x200; // climate command + echo/ack
+constexpr std::uint32_t Gear          = 0x300; // gear_signal (bit0 = R engaged)
+constexpr std::uint32_t Chassis       = 0x400; // steering angle
 } // namespace FrameId
 
 } // namespace sc

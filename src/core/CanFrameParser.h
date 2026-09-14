@@ -2,18 +2,20 @@
 
 #include <QByteArray>
 #include <QHash>
-#include <QList>
 #include <QString>
 
+#include <vector>
+
+#include "CanFrameParserCore.h"
 #include "CanTypes.h"
 
 namespace sc {
 
-// Lightweight DBC reader + decoder for the frames used by the cluster.
+// Thin Qt adapter over the pure C++ CanFrameParserCore.
 //
-// - Ships with a built-in signal table for 0x100/0x200/0x300/0x400 so the
-//   project runs out of the box (also used by the unit tests).
-// - Can load a real .dbc file (the BO_ / SG_ subset) via loadDbcFile().
+// The parsing/encoding logic (and the DBC subset reader) lives in
+// CanFrameParserCore and pulls in no Qt headers; this class only converts
+// between Qt containers and the std:: types at the boundary.
 class CanFrameParser
 {
 public:
@@ -22,25 +24,18 @@ public:
     bool loadDbcFile(const QString &path);
     bool loadDbcText(const QString &text);
 
-    // Decode every known signal of `id` into `out`. Returns true when the
-    // frame id is known and data is long enough.
     bool decode(quint32 id, const QByteArray &data, QHash<QString, double> *out) const;
-
-    // Encode the given signal values into a CAN payload (Intel/Motorola aware).
     bool encode(quint32 id, const QHash<QString, double> &values, QByteArray *out) const;
 
-    QList<CanSignalDef> signalDefs(quint32 id) const;
+    std::vector<CanSignalDef> signalDefs(quint32 id) const;
     QString frameName(quint32 id) const;
 
-    // Single-signal decode helpers (useful for diagnostics/tests).
-    static double decodeSignal(const CanSignalDef &def, const QByteArray &data);
-    static bool encodeSignal(const CanSignalDef &def, double value, QByteArray *out);
+    // Escape hatch for code that wants the Qt-free core directly.
+    CanFrameParserCore &core() { return m_core; }
+    const CanFrameParserCore &core() const { return m_core; }
 
 private:
-    void installBuiltinTable();
-    bool parseDbcLine(const QString &line, quint32 *currentFrameId);
-
-    QHash<quint32, QList<CanSignalDef>> m_frames;
+    CanFrameParserCore m_core;
 };
 
 } // namespace sc

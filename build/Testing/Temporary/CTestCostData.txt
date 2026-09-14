@@ -1,0 +1,6 @@
+tst_canframeparser 1 0.00947401
+tst_climateservice 1 0.686524
+tst_screenmanager 1 0.0314558
+tst_ui 1 0.621524
+tst_core_cxx 1 0.00391304
+---

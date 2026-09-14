@@ -53,14 +53,16 @@ tspi/
 │   ├── main.cpp
 │   ├── core/
 │   │   ├── SystemState.h        # SystemState/PageId/PagePriority/ClimateState
-│   │   ├── CanTypes.h           # CanSignalDef + 帧 ID
-│   │   ├── CanFrameParser.h/.cpp# DBC 解析/编码（0x100-0x400）
+│   │   ├── CanTypes.h           # CanSignalDef + 帧 ID（纯 C++）
+│   │   ├── CanFrameParserCore.h/.cpp  # DBC 解析/编码核心（纯 C++，无 Qt）
+│   │   ├── CanFrameParser.h/.cpp# Qt 适配层：QString/QByteArray <-> std 容器
 │   │   ├── CanManager.h/.cpp    # SocketCAN 接收线程（阻塞 read）
 │   │   ├── CarService.h/.cpp    # 车辆状态汇总 + 空调确认/回滚
 │   │   ├── SignalSimulator.h/.cpp # --sim 内置信号模拟器
 │   │   └── HealthMonitor.h/.cpp # 状态机轮询
 │   ├── logging/
-│   │   └── AsyncLogger.h/.cpp   # 异步文件日志 + 10MB 滚动
+│   │   ├── AsyncLoggerCore.h/.cpp # 异步文件日志核心（纯 C++，无 Qt）
+│   │   └── AsyncLogger.h/.cpp   # Qt 适配层 + qDebug 路由
 │   ├── media/
 │   │   └── MediaService.h/.cpp  # GStreamer playbin 封装（ALSA 输出）
 │   ├── camera/
@@ -77,11 +79,27 @@ tspi/
 │       └── ReverseCameraPage.h/.cpp
 └── tests/
     ├── CMakeLists.txt
+    ├── tst_core_cxx.cpp         # 纯 C++ 核心测试（只链接无 Qt 的 core 库）
     ├── tst_canframeparser.cpp   # DBC 解析/编码测试
     ├── tst_climateservice.cpp   # 空调 ACK/超时回滚测试
     ├── tst_screenmanager.cpp    # 页面抢占/优先级测试
     └── tst_ui.cpp               # UI 冒烟测试（offscreen）
 ```
+
+## 分层与解耦
+
+代码分为两个 CMake target：
+
+- `smart_cockpit_cxx`：**纯 C++ 标准库实现**，不含任何 Qt 头文件。包含
+  `CanFrameParserCore`（DBC 解析/编码）与 `AsyncLoggerCore`（异步文件日志）。
+  可脱离 Qt 编译、复用与测试。
+- `smart_cockpit_core`：Qt 层。其中的 `CanFrameParser` / `AsyncLogger` 是
+  **薄适配层**，只做 `QString`/`QByteArray`/`QHash` 与 `std::string`/
+  `std::vector`/`std::unordered_map` 之间的转换，业务逻辑全部委托给核心类。
+
+`tst_core_cxx` 只链接 `smart_cockpit_cxx`，一旦核心模块误引入 Qt 即编译失败，
+作为解耦的守卫测试。
+
 
 ## 主机调试（Ubuntu 20.04）
 

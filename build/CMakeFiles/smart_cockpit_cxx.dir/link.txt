@@ -1,0 +1,2 @@
+/usr/bin/ar qc libsmart_cockpit_cxx.a CMakeFiles/smart_cockpit_cxx.dir/smart_cockpit_cxx_autogen/mocs_compilation.cpp.o CMakeFiles/smart_cockpit_cxx.dir/src/core/CanFrameParserCore.cpp.o CMakeFiles/smart_cockpit_cxx.dir/src/logging/AsyncLoggerCore.cpp.o
+/usr/bin/ranlib libsmart_cockpit_cxx.a

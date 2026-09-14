@@ -1,0 +1,287 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-b2fa48afc3faa2325b7f.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				},
+				{
+					"build" : "tests",
+					"jsonFile" : "directory-tests-Debug-b01f6abb0ab61427ef3b.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "tests",
+					"targetIndexes" : 
+					[
+						9,
+						10,
+						11,
+						12,
+						13,
+						14,
+						15,
+						16,
+						17,
+						18,
+						19,
+						20,
+						21,
+						22,
+						23
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0,
+						1
+					],
+					"name" : "smart_cockpit",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12,
+						13,
+						14,
+						15,
+						16,
+						17,
+						18,
+						19,
+						20,
+						21,
+						22,
+						23
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "smart-cockpit::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-smart-cockpit-Debug-fbab1a4cf334a9b2231b.json",
+					"name" : "smart-cockpit",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "smart-cockpit_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-smart-cockpit_autogen-Debug-3f5497354ba3de879859.json",
+					"name" : "smart-cockpit_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "smart-cockpit_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-smart-cockpit_autogen_timestamp_deps-Debug-970f7a8101994a3d9bc7.json",
+					"name" : "smart-cockpit_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "smart_cockpit_core::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-smart_cockpit_core-Debug-2ed19614f4d18fbf300b.json",
+					"name" : "smart_cockpit_core",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "smart_cockpit_core_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-smart_cockpit_core_autogen-Debug-6b796fff26fd1939dad7.json",
+					"name" : "smart_cockpit_core_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "smart_cockpit_core_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-smart_cockpit_core_autogen_timestamp_deps-Debug-52b042ac1448f1205836.json",
+					"name" : "smart_cockpit_core_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "smart_cockpit_cxx::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-smart_cockpit_cxx-Debug-a6cd19e855568a627ddc.json",
+					"name" : "smart_cockpit_cxx",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "smart_cockpit_cxx_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-smart_cockpit_cxx_autogen-Debug-1f0fd9387908c8dbc8d8.json",
+					"name" : "smart_cockpit_cxx_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "smart_cockpit_cxx_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-smart_cockpit_cxx_autogen_timestamp_deps-Debug-b328a10188786c2a808b.json",
+					"name" : "smart_cockpit_cxx_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_canframeparser::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_canframeparser-Debug-1bda8abe351f3178dd63.json",
+					"name" : "tst_canframeparser",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_canframeparser_autogen::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_canframeparser_autogen-Debug-1bc49e30c19e3b07173d.json",
+					"name" : "tst_canframeparser_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_canframeparser_autogen_timestamp_deps::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_canframeparser_autogen_timestamp_deps-Debug-f00fb4717bbc5b451f21.json",
+					"name" : "tst_canframeparser_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_climateservice::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_climateservice-Debug-743ab43f483dea8877bb.json",
+					"name" : "tst_climateservice",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_climateservice_autogen::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_climateservice_autogen-Debug-b8426a6a7f7ac8a43ec9.json",
+					"name" : "tst_climateservice_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_climateservice_autogen_timestamp_deps::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_climateservice_autogen_timestamp_deps-Debug-e89017314cea37c261b0.json",
+					"name" : "tst_climateservice_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_core_cxx::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_core_cxx-Debug-db996db61c8e0f84350c.json",
+					"name" : "tst_core_cxx",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_core_cxx_autogen::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_core_cxx_autogen-Debug-be29133697429b69f62b.json",
+					"name" : "tst_core_cxx_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_core_cxx_autogen_timestamp_deps::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_core_cxx_autogen_timestamp_deps-Debug-47af15641663265a67cb.json",
+					"name" : "tst_core_cxx_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_screenmanager::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_screenmanager-Debug-ca42eae284e182fe6f80.json",
+					"name" : "tst_screenmanager",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_screenmanager_autogen::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_screenmanager_autogen-Debug-86bd29d160fed70b2aaf.json",
+					"name" : "tst_screenmanager_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_screenmanager_autogen_timestamp_deps::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_screenmanager_autogen_timestamp_deps-Debug-5ba0d35b44eab9bd4bcc.json",
+					"name" : "tst_screenmanager_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_ui::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_ui-Debug-fdd56e7b9a05c1368cd2.json",
+					"name" : "tst_ui",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_ui_autogen::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_ui_autogen-Debug-3a11ece85ba4bf8486ad.json",
+					"name" : "tst_ui_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "tst_ui_autogen_timestamp_deps::@a44f0ac069e85531cdee",
+					"jsonFile" : "target-tst_ui_autogen_timestamp_deps-Debug-5eaef67bd0c9cb0eb9e9.json",
+					"name" : "tst_ui_autogen_timestamp_deps",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/air/qt/Smart_Cockpit_based_on_tspi/build/debug",
+		"source" : "/home/air/qt/Smart_Cockpit_based_on_tspi"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 6
+	}
+}

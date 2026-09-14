@@ -27,3 +27,9 @@ add_executable(tst_ui tst_ui.cpp)
 target_link_libraries(tst_ui PRIVATE smart_cockpit_core ${QT_TEST_PKG}::Test)
 add_test(NAME tst_ui COMMAND tst_ui)
 set_tests_properties(tst_ui PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Pure C++ core test: links ONLY the Qt-free smart_cockpit_cxx target, proving
+# the core modules build and run without Qt.
+add_executable(tst_core_cxx tst_core_cxx.cpp)
+target_link_libraries(tst_core_cxx PRIVATE smart_cockpit_cxx)
+add_test(NAME tst_core_cxx COMMAND tst_core_cxx)

@@ -32,7 +32,29 @@ endif()
 find_package(Threads REQUIRED)
 
 # ---------------------------------------------------------------------------
-# Core library (all non-main code; shared by the app and the unit tests)
+# Pure C++ core (standard library only, no Qt): parsing/encoding and the
+# asynchronous logger. Kept as a separate target so it can be built, reused and
+# unit-tested without pulling in Qt.
+# ---------------------------------------------------------------------------
+add_library(smart_cockpit_cxx STATIC
+  src/core/CanFrameParserCore.cpp
+  src/logging/AsyncLoggerCore.cpp
+)
+
+target_include_directories(smart_cockpit_cxx PUBLIC
+    src
+    src/core
+    src/logging
+)
+
+target_link_libraries(smart_cockpit_cxx PUBLIC Threads::Threads)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(smart_cockpit_cxx PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+# ---------------------------------------------------------------------------
+# Qt layer (adapters + UI; shared by the app and the unit tests)
 # ---------------------------------------------------------------------------
 add_library(smart_cockpit_core STATIC
   src/core/CanFrameParser.cpp
@@ -64,6 +86,7 @@ target_include_directories(smart_cockpit_core PUBLIC
 )
 
 target_link_libraries(smart_cockpit_core PUBLIC
+  smart_cockpit_cxx
   ${QT_PKG}::Widgets
   ${QT_PKG}::DBus
   PkgConfig::GST

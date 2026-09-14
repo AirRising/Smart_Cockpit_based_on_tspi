@@ -1,0 +1,4 @@
+2026-09-14 18:34:58.302 [INFO] Smart cockpit starting, log file: "/home/air/qt/Smart_Cockpit_based_on_tspi/build/debug/logs/smart-cockpit.log"
+2026-09-14 18:34:58.393 [WARN] Wayland does not support QWindow::requestActivate()
+2026-09-14 18:34:58.447 [WARN] CAN error: "interface vcan0 not found: 没有那个设备"
+2026-09-14 18:34:58.452 [INFO] Camera started "(test source)" QSize(1280, 720)

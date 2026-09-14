@@ -1,28 +1,22 @@
 #pragma once
 
-#include <QFile>
-#include <QMutex>
-#include <QQueue>
 #include <QString>
-#include <QWaitCondition>
 
-#include <thread>
+#include "AsyncLoggerCore.h"
 
 namespace sc {
 
-// Asynchronous file logger.
+// Thin Qt adapter over the pure C++ AsyncLoggerCore.
 //
-// - Writes to /var/log/smart-cockpit/smart-cockpit.log by default and falls
-//   back to ./logs when /var/log is not writable.
-// - Rotates at 10 MB per file (keeps one .1 backup).
-// - Never blocks the GUI thread: log() only enqueues and wakes the writer.
+// All queuing/rotation/file I/O lives in AsyncLoggerCore (no Qt); this class
+// only bridges QString and installs the qDebug/qWarning message handler.
 class AsyncLogger
 {
 public:
     enum Level {
-        Info = 0,
-        Warn,
-        Error
+        Info = AsyncLoggerCore::Info,
+        Warn = AsyncLoggerCore::Warn,
+        Error = AsyncLoggerCore::Error
     };
 
     static AsyncLogger &instance();
@@ -40,27 +34,8 @@ public:
 
 private:
     AsyncLogger() = default;
-    ~AsyncLogger();
-    Q_DISABLE_COPY(AsyncLogger)
-
-    struct Entry {
-        Level level;
-        QString message;
-        qint64 tsMs;
-    };
-
-    void writerLoop();
-    void rotateIfNeeded();
-
-    std::thread m_thread;
-    mutable QMutex m_mutex;
-    QWaitCondition m_cond;
-    QQueue<Entry> m_queue;
-    QFile m_file;
-    QString m_dir;
-    Level m_minLevel = Info;
-    bool m_running = false;
-    bool m_stopRequested = false;
+    AsyncLogger(const AsyncLogger &) = delete;
+    AsyncLogger &operator=(const AsyncLogger &) = delete;
 };
 
 // Routes qDebug/qWarning/qCritical/qFatal through AsyncLogger.
