@@ -6,6 +6,7 @@
 #include <QSlider>
 #include <QWidget>
 
+#include "BatteryWidget.h"
 #include "CarService.h"
 #include "ClimatePage.h"
 #include "GaugeWidget.h"
@@ -84,7 +85,7 @@ void TestUiSmoke::instrumentGaugesFollowCanFrames()
 
     auto *speed = page.findChild<GaugeWidget *>(QStringLiteral("speedGauge"));
     auto *rpm = page.findChild<GaugeWidget *>(QStringLiteral("rpmGauge"));
-    auto *fuel = page.findChild<GaugeWidget *>(QStringLiteral("fuelGauge"));
+    auto *fuel = page.findChild<BatteryWidget *>(QStringLiteral("batteryWidget"));
     QVERIFY(speed && rpm && fuel);
     QCOMPARE(speed->value(), 120.0);
     QCOMPARE(rpm->value(), 3000.0);

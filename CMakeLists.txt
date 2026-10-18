@@ -69,6 +69,7 @@ add_library(smart_cockpit_core STATIC
   src/ui/ScreenManager.cpp
   src/ui/Theme.cpp
   src/ui/GaugeWidget.cpp
+  src/ui/BatteryWidget.cpp
   src/ui/InstrumentPage.cpp
   src/ui/ClimatePage.cpp
   src/ui/MediaPage.cpp
