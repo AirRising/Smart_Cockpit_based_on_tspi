@@ -64,6 +64,7 @@ void CarService::stop()
     m_ackTimer.stop();
     if (m_can)
         m_can->closeBus();
+    cancelClimateCommand(m_climateRequestSeq);
 }
 
 bool CarService::canConnected() const
@@ -134,8 +135,8 @@ void CarService::onCanFrame(quint32 id, const QByteArray &data, bool extended)
 
 quint32 CarService::sendClimateCommand(const sc::ClimateState &target)
 {
-    ++m_climateRequestSeq;
-    const quint32 requestId = m_climateRequestSeq;
+    if (m_pendingClimate)
+        return 0;
 
     QHash<QString, double> values;
     values.insert(QStringLiteral("temp_set"), target.temperature);
@@ -156,11 +157,26 @@ quint32 CarService::sendClimateCommand(const sc::ClimateState &target)
         qWarning() << "CAN not open - climate command not sent (simulation/test mode)";
     }
 
+    if (++m_climateRequestSeq == 0)
+        ++m_climateRequestSeq; // 0 is reserved for rejected commands.
+    const quint32 requestId = m_climateRequestSeq;
+    m_pendingClimateTarget = target;
     m_pendingClimate = true;
     m_ackTimer.start();
     qInfo() << "Climate command" << requestId << "sent:" << target.temperature << "C fan"
             << target.fanSpeed << "ac" << target.acOn << "auto" << target.autoMode;
     return requestId;
+}
+
+bool CarService::cancelClimateCommand(quint32 requestId)
+{
+    if (!m_pendingClimate || requestId == 0 || requestId != m_climateRequestSeq)
+        return false;
+
+    m_ackTimer.stop();
+    m_pendingClimate = false;
+    emit climateCommandCancelled(requestId);
+    return true;
 }
 
 void CarService::handleFrame100(const QByteArray &data)
@@ -217,7 +233,11 @@ void CarService::handleFrame200(const QByteArray &data)
     echoed.autoMode = s.value(QStringLiteral("auto_mode")) > 0.5;
     const bool ack = s.value(QStringLiteral("ack")) > 0.5;
 
-    if (ack && m_pendingClimate) {
+    if (ack) {
+        // Without a wire transaction ID, identical-target stale ACKs cannot be distinguished.
+        if (!m_pendingClimate || echoed != m_pendingClimateTarget)
+            return;
+
         // Vehicle confirmed our command.
         m_pendingClimate = false;
         m_ackTimer.stop();

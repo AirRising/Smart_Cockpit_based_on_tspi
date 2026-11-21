@@ -63,10 +63,11 @@ public slots:
     // Public so unit tests / diagnostics can inject raw frames without a bus.
     void onCanFrame(quint32 id, const QByteArray &data, bool extended = false);
 
-    // Send a climate command and wait for the vehicle echo + ack.
-    // Returns a request id; on success `climateAckOk(requestId)` is emitted,
-    // on timeout `climateAckTimeout(requestId)` (UI must roll back).
+    // Returns a request ID, or 0 if busy / encoding fails.
     quint32 sendClimateCommand(const sc::ClimateState &target);
+
+    // Cancel only the matching pending request; emits climateCommandCancelled.
+    bool cancelClimateCommand(quint32 requestId);
 
 signals:
     void speedChanged(double kmh);
@@ -81,6 +82,7 @@ signals:
     void climateStateChanged(const sc::ClimateState &state);
     void climateAckOk(quint32 requestId);
     void climateAckTimeout(quint32 requestId);
+    void climateCommandCancelled(quint32 requestId);
 
     void canConnectionChanged(bool connected);
 
@@ -115,6 +117,7 @@ private:
 
     // 0x200
     sc::ClimateState m_climate;
+    sc::ClimateState m_pendingClimateTarget;
     quint32 m_climateRequestSeq = 0;
     bool m_pendingClimate = false;
     QTimer m_ackTimer;
