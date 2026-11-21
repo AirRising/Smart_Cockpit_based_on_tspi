@@ -80,6 +80,20 @@ void stripChar(std::string *s, char c)
     s->erase(std::remove(s->begin(), s->end(), c), s->end());
 }
 
+// Returns 0 for layouts that cannot fit in a classic CAN frame.
+int requiredSignalBytes(const CanSignalDef &def)
+{
+    if (def.startBit < 0 || def.startBit >= 64 ||
+        def.bitLength < 1 || def.bitLength > 64)
+        return 0;
+
+    // Motorola walks down from the start bit, then from bit 7 of the next byte.
+    const int needBytes = def.bigEndian
+        ? def.startBit / 8 + (7 - def.startBit % 8 + def.bitLength + 7) / 8
+        : (def.startBit + def.bitLength + 7) / 8;
+    return needBytes <= 8 ? needBytes : 0;
+}
+
 } // namespace
 
 CanFrameParserCore::CanFrameParserCore()
@@ -199,6 +213,8 @@ bool CanFrameParserCore::parseDbcLine(const std::string &line,
         def.bitLength = bitLength;
         def.bigEndian = lenOrder.substr(at + 1, 1) == "0";
         def.isSigned = !lenOrder.empty() && lenOrder.back() == '-';
+        if (requiredSignalBytes(def) == 0)
+            return false;
 
         // "(factor,offset)"
         std::string factorOffset = tokens[4];
@@ -248,8 +264,8 @@ bool CanFrameParserCore::parseDbcLine(const std::string &line,
 double CanFrameParserCore::decodeSignal(const CanSignalDef &def,
                                         const std::vector<std::uint8_t> &data)
 {
-    if (def.startBit / 8 + (def.bitLength + 7) / 8 >
-        static_cast<int>(data.size()))
+    const int needBytes = requiredSignalBytes(def);
+    if (needBytes == 0 || static_cast<std::size_t>(needBytes) > data.size())
         return 0.0;
 
     std::uint64_t raw = 0;
@@ -257,7 +273,7 @@ double CanFrameParserCore::decodeSignal(const CanSignalDef &def,
         // Motorola: startBit points at the MSB of the signal. Bits run
         // right-to-left inside the first byte, then continue in the next byte.
         int byteIdx = def.startBit / 8;
-        int bitInByte = 7 - (def.startBit % 8);
+        int bitInByte = def.startBit % 8;
         for (int i = 0; i < def.bitLength; ++i) {
             raw = (raw << 1) |
                   static_cast<std::uint64_t>((data[byteIdx] >> bitInByte) & 0x01);
@@ -294,17 +310,19 @@ double CanFrameParserCore::decodeSignal(const CanSignalDef &def,
 bool CanFrameParserCore::encodeSignal(const CanSignalDef &def, double value,
                                       std::vector<std::uint8_t> *out)
 {
-    if (static_cast<int>(out->size()) <
-        def.startBit / 8 + (def.bitLength + 7) / 8)
-        out->resize(def.startBit / 8 + (def.bitLength + 7) / 8);
+    const int needBytes = requiredSignalBytes(def);
+    if (needBytes == 0)
+        return false;
+    if (out->size() < static_cast<std::size_t>(needBytes))
+        out->resize(needBytes);
 
     std::int64_t raw = std::llround((value - def.offset) / def.factor);
     if (def.bitLength < 64)
-        raw &= (std::int64_t(1) << def.bitLength) - 1;
+        raw &= (std::uint64_t(1) << def.bitLength) - 1;
 
     if (def.bigEndian) {
         int byteIdx = def.startBit / 8;
-        int bitInByte = 7 - (def.startBit % 8);
+        int bitInByte = def.startBit % 8;
         for (int i = def.bitLength - 1; i >= 0; --i) {
             const bool bit = (raw >> i) & 0x01;
             if (bit)
@@ -348,8 +366,8 @@ bool CanFrameParserCore::decode(
     // mix of real values and zeroed fields. Reject it so callers keep the
     // last known-good state instead of showing misleading data.
     for (const CanSignalDef &def : it->second) {
-        const int needBytes = def.startBit / 8 + (def.bitLength + 7) / 8;
-        if (needBytes > static_cast<int>(data.size()))
+        const int needBytes = requiredSignalBytes(def);
+        if (needBytes == 0 || static_cast<std::size_t>(needBytes) > data.size())
             return false;
     }
 
