@@ -4,6 +4,7 @@
 #include <QImage>
 #include <QObject>
 #include <QSize>
+#include <QTimer>
 
 namespace sc {
 
@@ -38,10 +39,15 @@ signals:
     void cameraError(const QString &message);
 
 private:
+    void pollStream();
+
     void *m_pipeline = nullptr; // GstElement*
     void *m_appsink = nullptr;  // GstAppSink*
+    void *m_bus = nullptr;      // GstBus*
+    QTimer m_pollTimer;
     QSize m_resolution{1280, 720};
     QAtomicInteger<qint64> m_lastFrameMs{0};
+    QAtomicInteger<quint64> m_streamGeneration{0};
     bool m_running = false;
 };
 

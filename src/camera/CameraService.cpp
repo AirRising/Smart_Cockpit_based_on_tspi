@@ -44,6 +44,8 @@ GstFlowReturn onNewSampleCb(GstAppSink *appsink, gpointer userData)
 CameraService::CameraService(QObject *parent)
     : QObject(parent)
 {
+    m_pollTimer.setInterval(200);
+    connect(&m_pollTimer, &QTimer::timeout, this, &CameraService::pollStream);
 }
 
 CameraService::~CameraService()
@@ -56,6 +58,7 @@ bool CameraService::start(const QString &devicePath, int width, int height, int 
     if (m_running)
         return true;
 
+    stop();
     gst_init(nullptr, nullptr);
     m_resolution = QSize(width, height);
 
@@ -78,19 +81,22 @@ bool CameraService::start(const QString &devicePath, int width, int height, int 
     GError *error = nullptr;
     m_pipeline = gst_parse_launch(pipelineText.toUtf8().constData(), &error);
     if (!m_pipeline || error) {
-        emit cameraError(QString::fromUtf8(error ? error->message : "pipeline parse failed"));
+        const QString message = QString::fromUtf8(error ? error->message : "pipeline parse failed");
         if (error)
             g_error_free(error);
+        stop();
+        emit cameraError(message);
         return false;
     }
 
     m_appsink = gst_bin_get_by_name(GST_BIN(m_pipeline), "sink");
     if (!m_appsink) {
+        stop();
         emit cameraError(QStringLiteral("appsink not found in pipeline"));
-        gst_object_unref(GST_OBJECT(m_pipeline));
-        m_pipeline = nullptr;
         return false;
     }
+    m_bus = gst_element_get_bus(GST_ELEMENT(m_pipeline));
+    m_lastFrameMs.storeRelease(QDateTime::currentMSecsSinceEpoch());
 
     // Low-latency capture settings.
     gst_app_sink_set_max_buffers(GST_APP_SINK(m_appsink), 2);
@@ -104,12 +110,13 @@ bool CameraService::start(const QString &devicePath, int width, int height, int 
 
     if (gst_element_set_state(GST_ELEMENT(m_pipeline), GST_STATE_PLAYING) ==
         GST_STATE_CHANGE_FAILURE) {
-        emit cameraError(QStringLiteral("camera pipeline failed to start"));
         stop();
+        emit cameraError(QStringLiteral("camera pipeline failed to start"));
         return false;
     }
 
     m_running = true;
+    m_pollTimer.start();
     qInfo() << "Camera started" << (devicePath.isEmpty() ? QStringLiteral("(test source)")
                                                          : devicePath)
             << m_resolution;
@@ -118,20 +125,59 @@ bool CameraService::start(const QString &devicePath, int width, int height, int 
 
 void CameraService::stop()
 {
-    if (!m_pipeline)
-        return;
-
-    // Take the callbacks off first so no new-sample callback can run while we
-    // tear the pipeline down.
+    m_pollTimer.stop();
+    m_running = false;
+    m_streamGeneration.fetchAndAddOrdered(1);
     if (m_appsink) {
-        gst_app_sink_set_callbacks(GST_APP_SINK(m_appsink), nullptr, nullptr, nullptr);
+        GstAppSinkCallbacks callbacks {};
+        gst_app_sink_set_callbacks(GST_APP_SINK(m_appsink), &callbacks, nullptr, nullptr);
+    }
+    if (m_pipeline)
+        gst_element_set_state(GST_ELEMENT(m_pipeline), GST_STATE_NULL);
+    if (m_appsink) {
         gst_object_unref(GST_OBJECT(m_appsink));
         m_appsink = nullptr;
     }
-    gst_element_set_state(GST_ELEMENT(m_pipeline), GST_STATE_NULL);
-    gst_object_unref(GST_OBJECT(m_pipeline));
-    m_pipeline = nullptr;
-    m_running = false;
+    if (m_bus) {
+        gst_object_unref(GST_OBJECT(m_bus));
+        m_bus = nullptr;
+    }
+    if (m_pipeline) {
+        gst_object_unref(GST_OBJECT(m_pipeline));
+        m_pipeline = nullptr;
+    }
+    m_lastFrameMs.storeRelease(0);
+    emit frameReady(QImage());
+}
+
+void CameraService::pollStream()
+{
+    if (!m_running)
+        return;
+
+    QString failure;
+    GstMessage *message = gst_bus_pop_filtered(
+        GST_BUS(m_bus), GstMessageType(GST_MESSAGE_ERROR | GST_MESSAGE_EOS));
+    if (message) {
+        if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_ERROR) {
+            GError *error = nullptr;
+            gchar *debug = nullptr;
+            gst_message_parse_error(message, &error, &debug);
+            failure = QString::fromUtf8(error ? error->message : "camera stream failed");
+            if (error)
+                g_error_free(error);
+            g_free(debug);
+        } else {
+            failure = QStringLiteral("camera stream ended");
+        }
+        gst_message_unref(message);
+    } else if (lastFrameAgeMs() >= 2500) {
+        failure = QStringLiteral("camera frame timed out");
+    }
+    if (!failure.isEmpty()) {
+        stop();
+        emit cameraError(failure);
+    }
 }
 
 bool CameraService::isRunning() const
@@ -151,6 +197,7 @@ QSize CameraService::resolution() const
 
 void CameraService::handleSample(void *sampleRaw)
 {
+    const quint64 generation = m_streamGeneration.loadAcquire();
     auto *sample = static_cast<GstSample *>(sampleRaw);
     GstBuffer *buffer = gst_sample_get_buffer(sample);
     GstCaps *caps = gst_sample_get_caps(sample);
@@ -188,7 +235,11 @@ void CameraService::handleSample(void *sampleRaw)
 
     gst_video_frame_unmap(&frame);
     m_lastFrameMs.storeRelease(QDateTime::currentMSecsSinceEpoch());
-    emit frameReady(image);
+    // Queued frames from a stopped stream must not repaint over the no-signal state.
+    QMetaObject::invokeMethod(this, [this, image, generation]() {
+        if (m_running && generation == m_streamGeneration.loadAcquire())
+            emit frameReady(image);
+    }, Qt::QueuedConnection);
 }
 
 } // namespace sc
