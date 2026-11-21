@@ -3,6 +3,9 @@ VERSION "smart-cockpit 1.0"
 NS_ :
 BS_:
 
+CM_ "Smart Cockpit 示例 DBC：描述 0x100/0x200/0x300/0x400 四帧，字段与内置信号表一致。";
+CM_ "仅使用 BO_/SG_ 子集，可被 --dbc 加载并覆盖内置表；解析器会跳过所有 CM_ 行。";
+
 BO_ 256 ICU: 8 ICU
  SG_ speed : 0|16@1+ (1,0) [0|240] "km/h" ICU
  SG_ engine_rpm : 16|16@1+ (1,0) [0|8000] "rpm" ICU
@@ -27,3 +30,28 @@ BO_ 768 Gear: 8 Gear
 
 BO_ 1024 Chassis: 8 Chassis
  SG_ steering_angle : 0|16@1- (0.1,0) [-900|900] "deg" Chassis
+
+CM_ BO_ 256 "ICU 0x100：仪表动态数据（CAN -> UI），DLC=8。";
+CM_ SG_ 256 speed "车速，Intel 小端，16bit，单位 km/h，范围 0-240。";
+CM_ SG_ 256 engine_rpm "电机转速，16bit，单位 rpm，范围 0-8000。";
+CM_ SG_ 256 fuel_level "电量，8bit，原始值 x0.5 得百分比，范围 0-100%。";
+CM_ SG_ 256 left_indicator "左转向灯，1bit，1=点亮。";
+CM_ SG_ 256 right_indicator "右转向灯，1bit，1=点亮。";
+CM_ SG_ 256 hazard "双闪，1bit，1=开启（与左右转向灯配合判断）。";
+CM_ SG_ 256 mil_engine "电机故障灯，1bit，1=报警。";
+CM_ SG_ 256 mil_abs "ABS 故障灯，1bit，1=报警。";
+CM_ SG_ 256 mil_airbag "气囊故障灯，1bit，1=报警。";
+
+CM_ BO_ 512 "HVAC 0x200：空调控制指令（UI -> CAN）与车辆回传/ACK（CAN -> UI），DLC=8。";
+CM_ SG_ 512 temp_set "设定温度，8bit，单位 ℃，范围 16-30。";
+CM_ SG_ 512 fan_speed "风量档位，4bit，范围 0-7。";
+CM_ SG_ 512 blow_mode "吹风模式，2bit，0=吹面 1=吹面+脚 2=吹脚 3=除霜。";
+CM_ SG_ 512 ac_on "AC 制冷开关，1bit，1=开。";
+CM_ SG_ 512 auto_mode "自动模式，1bit，1=自动。";
+CM_ SG_ 512 ack "车辆确认位，1bit，回传 ack=1 表示指令生效；UI 超时未收到则回滚。";
+
+CM_ BO_ 768 "Gear 0x300：档位/倒车信号，DLC=8。";
+CM_ SG_ 768 gear_signal "档位，8bit：bit0=1 表示 R 挡（触发倒车影像），bit1-3 为 P/R/N/D。";
+
+CM_ BO_ 1024 "Chassis 0x400：底盘/方向盘信号，DLC=8。";
+CM_ SG_ 1024 steering_angle "方向盘转角，Intel 有符号 16bit x0.1，单位 deg，范围 -900..900；用于倒车轨迹线。";
