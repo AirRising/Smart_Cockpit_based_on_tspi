@@ -16,8 +16,17 @@
 - **交叉编译与部署**：aarch64 工具链 + sysroot 交叉构建，rsync + systemd 一键部署。
 - **健壮性**：异步文件日志（10MB 滚动）、系统状态机（Normal/Degraded/Emergency）、
   内置信号模拟器（无 CAN/vcan 也能完整演示）。
-- **可测试性**：核心逻辑与 UI 分层，Qt Test 覆盖 CAN 解析、空调 ACK、页面调度，
-  并支持 `offscreen` 无头运行。
+- **现代车载 HMI 视觉**：统一设计 token（深色底 `#0A0E14`、单色强调 `#2F81F7`、
+  语义色 Ok/Warn/Err/Cool/Warm），全局 Theme QSS + 属性选择器，**无任何位图
+  素材**——图标全部为 QPainter 路径或 Unicode 几何符号。
+- **弱平台渲染优化**：所有自绘控件（仪表/电量/温度盘/专辑占位块）采用
+  **静态层 QPixmap 缓存**——表盘、刻度、外壳在 `resizeEvent` 一次性渲染，
+  `paintEvent` 只画值弧/指针/读数，无每帧渐变/字体/路径重建；数字读数用等宽
+  字体防跳动。
+- **空调指令防抖**：连续调节经 250ms debounce 合并为一条 CAN 指令，ACK 前锁面板、
+  超时回滚，支持手动取消待确认指令。
+- **可测试性**：核心逻辑与 UI 分层，Qt Test 覆盖 CAN 解析、空调 ACK/防抖/取消、
+  页面调度、UI 冒烟，并支持 `offscreen` 无头运行。
 
 ## 功能模块
 
@@ -28,10 +37,10 @@
 | 系统状态机 | Normal / Degraded / Emergency，HealthMonitor 轮询各服务，驱动顶栏状态胶囊（绿/橙/红） |
 | 日志 | 异步写 `/var/log/smart-cockpit/`，Info/Warn/Error，单文件 10MB 滚动 |
 | 部署 | CMake + aarch64 交叉工具链 + systemd 单元 + 一键部署脚本 |
-| 数字仪表 | 车速 0-240 km/h、电机转速 0-8000 rpm、电量 0-100%、转向灯（左/右/双闪）、故障灯（电机/ABS/气囊），数据来自 CAN 0x100 |
-| 中控多媒体 | GStreamer `playbin` 播放本地 MP3/FLAC，输出到 ALSA |
-| 空调面板 | 自绘温度圆表 16-30℃、风量 0-7、吹风模式、内/外循环、AC 制冷/自动；双向 CAN 0x200，等待车辆回传 ACK，超时回滚 UI |
-| 倒车影像 | R 挡（CAN 0x300 bit0）全屏显示，GStreamer appsink 拉取 NV12 流转 RGBA，QOpenGLWidget 渲染，叠加随方向盘角度变化的轨迹线 |
+| 数字仪表 | 竖屏三段布局：大字车速（0–240 km/h）、电机转速（0–8000 rpm）双圆表 + 底部状态卡（挡位 P/R/N/D、电池样式电量、6 枚自绘指示灯），数据来自 CAN 0x100 |
+| 中控多媒体 | GStreamer `playbin` 播放本地 MP3/FLAC，ALSA 输出；竖屏上播放下列表布局，自绘专辑占位块（曲名首字母）、QPainter 三联控制键；播放错误上报状态条 |
+| 空调面板 | 自绘温度圆表 16–30℃（≤20℃ 冷色 / >20℃ 暖色双色态）、风量 0–7、QPainter 图标的吹风模式/内外循环键、AC/自动；250ms 防抖下发 CAN 0x200，等车辆 ACK，超时回滚 UI，可手动取消 |
+| 倒车影像 | R 挡（CAN 0x300 bit0）全屏显示，GStreamer appsink 拉取 NV12 流转 RGBA，QOpenGLWidget 渲染，叠加随方向盘角度变化的轨迹线；下方条带为 R 徽章与标题 |
 
 ## 目录结构
 
@@ -71,17 +80,18 @@ tspi/
 │   └── ui/
 │       ├── MainWindow.h/.cpp    # 顶栏 + QStackedWidget + 底部导航
 │       ├── ScreenManager.h/.cpp # 优先级页面管理
-│       ├── Theme.h/.cpp         # 全局 QSS 主题
-│       ├── InstrumentPage.h/.cpp
-│       ├── GaugeWidget.h/.cpp   # QPainter 圆形仪表
-│       ├── ClimatePage.h/.cpp
-│       ├── MediaPage.h/.cpp
+│       ├── Theme.h/.cpp         # 设计 token + 全局 QSS + 等宽数字字体
+│       ├── InstrumentPage.h/.cpp# 仪表页（含文件内 LampWidget 指示灯）
+│       ├── GaugeWidget.h/.cpp   # QPainter 圆形仪表（静态层缓存）
+│       ├── BatteryWidget.h/.cpp # 电池样式电量（静态层缓存）
+│       ├── ClimatePage.h/.cpp   # 空调页（含文件内 TempDialWidget/IconButton）
+│       ├── MediaPage.h/.cpp     # 媒体页（含文件内 AlbumArt/ElidedLabel/TransportButton）
 │       └── ReverseCameraPage.h/.cpp
 └── tests/
     ├── CMakeLists.txt
     ├── tst_core_cxx.cpp         # 纯 C++ 核心测试（只链接无 Qt 的 core 库）
     ├── tst_canframeparser.cpp   # DBC 解析/编码测试
-    ├── tst_climateservice.cpp   # 空调 ACK/超时回滚测试
+    ├── tst_climateservice.cpp   # 空调 ACK/超时回滚/取消按钮/防抖合并测试
     ├── tst_screenmanager.cpp    # 页面抢占/优先级测试
     └── tst_ui.cpp               # UI 冒烟测试（offscreen）
 ```
@@ -100,6 +110,37 @@ tspi/
 `tst_core_cxx` 只链接 `smart_cockpit_cxx`，一旦核心模块误引入 Qt 即编译失败，
 作为解耦的守卫测试。
 
+## UI 视觉体系
+
+**设计 token**（`Theme.h` 常量，全项目唯一事实来源，禁止 .cpp 内联魔数）：
+
+| 类别 | 值 |
+| --- | --- |
+| 背景 / 卡片 / 分隔线 | `#0A0E14` / `#161B22` / `#21262D` |
+| 主文字 / 次文字 / 禁用 | `#E6EDF3` / `#8B949E` / `#484F58` |
+| 强调色 | `#2F81F7`（Accent），文字态强调 `#38BDF8`（Cool） |
+| 语义色 | Ok `#22C55E` / Warn `#F59E0B` / Err `#EF4444` / Warm `#FB923C` |
+| 圆角 | 8 / 12 / 16 px；间距一律 8 的倍数 |
+
+**实现要点**：
+
+- `Theme::styleSheet()` 一份全局 QSS 管所有标准控件；动态状态（系统健康胶囊、
+  CAN 连接点、空调确认状态）用 **QSS 属性选择器**（`[state="ok|warn|err"]`、
+  `[connected="true|false"]`）+ `setProperty`/`polish`，零内联样式。
+- 数字读数（表盘/温度/电量/时间）统一 `Theme::monoFont()` 等宽字体，刷新不跳动。
+- 自绘控件一律**静态层缓存**：`resizeEvent`（或 configure）时把表盘/刻度/外壳
+  渲染进成员 `QPixmap`，`paintEvent` 只 blit + 画动态图元；无渐变对象每帧重建、
+  无 `QGraphicsEffect`、无常驻动画。
+- 文件内私有控件（不新增源文件）：`LampWidget`（指示灯）、`TempDialWidget` 与
+  `IconButton`（温度盘/空调模式图标键）、`AlbumArtWidget`/`ElidedLabel`/
+  `TransportButton`（专辑块/省略号标签/播放控制键）。
+
+**页面布局**（800×1280 竖屏，stretch 自适应）：
+
+- 仪表页：车速卡 : 转速卡 : 状态卡 = 47 : 30 : 20
+- 空调页：温度卡 : 风速卡 : (吹风模式+循环模式) : 底行 = 42 : 18 : 24 : 固定
+- 媒体页：播放卡 : 列表卡 = 37 : 63
+- 倒车页：视频区（stretch 1）+ 底部条带（标题居中、R 徽章居右，不遮挡画面）
 
 ## 主机调试（Ubuntu 20.04）
 
@@ -187,6 +228,22 @@ connect(car, &CarService::reverseChanged, this, &MainWindow::onReverseChanged);
 //                   false -> m_screen->dismissPage(ReverseCamera)
 ```
 
+## 空调指令链路（防抖 + ACK + 回滚）
+
+```
+用户拖动温度/风速滑块（或点模式键）
+  → onControlChanged：更新读数，重启 250ms debounce 定时器（不锁面板）
+  → 用户停止操作 250ms 后 timer 到期
+  → issueClimateCommand：readControls → CarService::sendClimateCommand
+  → m_pending = true，锁定面板，「取消待处理」按钮使能
+  → 车辆回发 0x200 且 ack=1 → climateAckOk → 解锁，按确认值刷新
+  → 600ms 未回 → climateAckTimeout → 解锁，UI 回滚到上次确认值
+  → （ pending 期间点「取消待处理」→ 立即按超时路径回滚 ）
+```
+
+要点：debounce 窗口内连续调节只产生**一条**指令；`m_syncing` 守卫区分"程序
+改控件 vs 用户改控件"，防止 `applyControls` 误触发新指令。
+
 ## CAN 帧格式（内置 DBC 表）
 
 | ID | 信号 | 位置/长度 | 说明 |
@@ -209,12 +266,18 @@ connect(car, &CarService::reverseChanged, this, &MainWindow::onReverseChanged);
 ctest --test-dir build --output-on-failure
 ```
 
+- `tst_core_cxx`：纯 C++ 核心（只链接无 Qt 的 core 库，作为解耦守卫）。
 - `tst_canframeparser`：0x100/0x300 解码、DBC 文本加载、0x200 编码回环、截断帧整帧拒绝。
-- `tst_climateservice`：发送 0x200 指令 → 收到 ack 后 `climateAckOk` 且状态更新；超时后 `climateAckTimeout` 且 UI 回滚为旧值；DBC 覆盖缺字段时保持最后有效状态（测试直接注入帧，不依赖真实 CAN）。
+- `tst_climateservice`：ACK 确认链路、超时回滚、DBC 覆盖缺字段保持最后有效状态、
+  **取消按钮随 pending 状态使能/禁用**、**debounce 合并连续调节为单条指令**
+  （测试直接注入帧，不依赖真实 CAN）。
 - `tst_screenmanager`：页面抢占逻辑（正常切页 / 倒车抢占 / 普通请求被拒 / 退出回到原页面）。
-- `tst_ui`：UI 冒烟测试——用真实 `CarService` 驱动各页面，验证 CAN 帧更新仪表、空调"改值→发指令→ack→刷新 UI"全链路，并把页面离屏渲染验证（`QT_QPA_PLATFORM=offscreen`，无头运行）。
+- `tst_ui`：UI 冒烟测试——用真实 `CarService` 驱动各页面，验证 CAN 帧更新仪表、
+  空调"改值→（debounce 后）发指令→ack→刷新 UI"全链路，并把页面离屏渲染验证
+  （`QT_QPA_PLATFORM=offscreen`，无头运行）。
 
-CI：`.github/workflows/ci.yml`（GitHub Actions）在每次 push/PR 自动构建 + 跑全部测试；本地/云服务器可用 `sudo ./scripts/ci.sh` 跑同一套门禁。
+CI：`.github/workflows/ci.yml`（GitHub Actions）在每次 push/PR 自动构建 + 跑全部测试；
+本地/云服务器可用 `sudo ./scripts/ci.sh` 跑同一套门禁。
 
 ## 生产部署注意事项
 
