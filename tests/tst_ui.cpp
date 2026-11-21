@@ -3,6 +3,7 @@
 #include <QImage>
 #include <QLabel>
 #include <QPixmap>
+#include <QPushButton>
 #include <QSlider>
 #include <QWidget>
 
@@ -63,6 +64,8 @@ private slots:
     void initTestCase();
     void instrumentGaugesFollowCanFrames();
     void climateRoundTripThroughUi();
+    void climateCancelThenNewRequest();
+    void climateRejectedSendDoesNotLockUi();
     void simulatorDrivesInstrument();
     void pagesRenderSomething();
 };
@@ -111,17 +114,17 @@ void TestUiSmoke::climateRoundTripThroughUi()
     QVERIFY(temp);
     QCOMPARE(temp->value(), 22); // default confirmed state
 
-    // User dials to 24 -> the UI must issue a climate command via CarService.
+    // User dials to 24 -> after the 250 ms debounce the UI must issue a
+    // climate command via CarService.
     temp->setValue(24);
-    QCoreApplication::processEvents();
-    QVERIFY(car.hasPendingClimate());
+    QTRY_VERIFY(car.hasPendingClimate());
 
     // Vehicle echoes the new set point with the ack bit set.
     QHash<QString, double> echo;
     echo.insert(QStringLiteral("temp_set"), 24.0);
     echo.insert(QStringLiteral("fan_speed"), 3.0);
     echo.insert(QStringLiteral("blow_mode"), 0.0);
-    echo.insert(QStringLiteral("ac_on"), 0.0);
+    echo.insert(QStringLiteral("ac_on"), 1.0);
     echo.insert(QStringLiteral("auto_mode"), 0.0);
     echo.insert(QStringLiteral("ack"), 1.0);
     QByteArray payload;
@@ -132,6 +135,168 @@ void TestUiSmoke::climateRoundTripThroughUi()
     QVERIFY(!car.hasPendingClimate());
     QCOMPARE(car.climate().temperature, 24);
     QCOMPARE(temp->value(), 24); // UI refreshed from the confirmed state
+}
+
+void TestUiSmoke::climateCancelThenNewRequest()
+{
+    CarService car;
+    ClimatePage page(&car);
+    page.show();
+    QCoreApplication::processEvents();
+    auto *temp = findSlider(page, 16);
+    auto *cancel = page.findChild<QPushButton *>(QStringLiteral("cancelPending"));
+    auto *status = page.findChild<QLabel *>(QStringLiteral("statusPill"));
+    QVERIFY(temp && cancel && status);
+    QSignalSpy cancelledSpy(&car, &CarService::climateCommandCancelled);
+    QSignalSpy timeoutSpy(&car, &CarService::climateAckTimeout);
+    QSignalSpy ackSpy(&car, &CarService::climateAckOk);
+
+    temp->setValue(24);
+    QTRY_VERIFY(car.hasPendingClimate());
+    QVERIFY(!temp->isEnabled());
+    QVERIFY(cancel->isEnabled());
+    cancel->click();
+    QVERIFY(!car.hasPendingClimate());
+    QCOMPARE(cancelledSpy.count(), 1);
+    const quint32 oldId = cancelledSpy.at(0).at(0).toUInt();
+    QVERIFY(oldId != 0);
+    QVERIFY(temp->isEnabled());
+    QVERIFY(!cancel->isEnabled());
+    QCOMPARE(temp->value(), 22);
+    QCOMPARE(status->text(), QStringLiteral("已取消"));
+    QTest::qWait(CarService::kClimateAckTimeoutMs + 150);
+    QCOMPARE(timeoutSpy.count(), 0);
+    QCOMPARE(status->text(), QStringLiteral("已取消"));
+
+    temp->setValue(28);
+    QTRY_VERIFY(car.hasPendingClimate());
+    QVERIFY(!temp->isEnabled());
+    QVERIFY(cancel->isEnabled());
+
+    // Simulate delayed local notifications for the cancelled request (and 0).
+    // These IDs are local only; no transaction ID is added to the CAN frame.
+    for (quint32 staleId : {quint32(0), oldId}) {
+        for (const char *signal : {"climateAckOk", "climateAckTimeout",
+                                   "climateCommandCancelled"}) {
+            QVERIFY(QMetaObject::invokeMethod(&car, signal, Qt::DirectConnection,
+                                               Q_ARG(quint32, staleId)));
+            QVERIFY(!temp->isEnabled());
+            QVERIFY(cancel->isEnabled());
+            QCOMPARE(temp->value(), 28);
+            QCOMPARE(status->text(), QStringLiteral("等待车辆确认..."));
+        }
+    }
+    ackSpy.clear();
+    timeoutSpy.clear();
+
+    QHash<QString, double> echo = {
+        {QStringLiteral("temp_set"), 24.0},
+        {QStringLiteral("fan_speed"), 3.0},
+        {QStringLiteral("blow_mode"), 0.0},
+        {QStringLiteral("ac_on"), 1.0},
+        {QStringLiteral("auto_mode"), 0.0},
+        {QStringLiteral("ack"), 1.0}
+    };
+    QByteArray payload;
+    QVERIFY(car.parser()->encode(FrameId::HVAC, echo, &payload));
+    car.onCanFrame(FrameId::HVAC, payload);
+    QVERIFY(car.hasPendingClimate());
+    QCOMPARE(ackSpy.count(), 0);
+    QCOMPARE(car.climate().temperature, 22);
+    QCOMPARE(temp->value(), 28);
+    QVERIFY(!temp->isEnabled());
+
+    echo[QStringLiteral("temp_set")] = 28.0;
+    QVERIFY(car.parser()->encode(FrameId::HVAC, echo, &payload));
+    car.onCanFrame(FrameId::HVAC, payload);
+    QVERIFY(!car.hasPendingClimate());
+    QCOMPARE(ackSpy.count(), 1);
+    const quint32 newId = ackSpy.at(0).at(0).toUInt();
+    QVERIFY(newId != 0 && newId != oldId);
+    QCOMPARE(car.climate().temperature, 28);
+    QCOMPARE(temp->value(), 28);
+    QVERIFY(temp->isEnabled());
+    QVERIFY(!cancel->isEnabled());
+    QCOMPARE(status->text(), QStringLiteral("已确认"));
+    QTest::qWait(CarService::kClimateAckTimeoutMs + 150);
+    QCOMPARE(timeoutSpy.count(), 0);
+    QCOMPARE(status->text(), QStringLiteral("已确认"));
+
+    // A notification without a UI pending request must also be ignored.
+    car.climateAckTimeout(newId);
+    car.climateCommandCancelled(newId);
+    QCOMPARE(status->text(), QStringLiteral("已确认"));
+    QCOMPARE(temp->value(), 28);
+    timeoutSpy.clear();
+
+    // A real timeout for the next UI request must still unlock and roll back.
+    temp->setValue(26);
+    QTRY_VERIFY(car.hasPendingClimate());
+    QVERIFY(!temp->isEnabled());
+    QVERIFY(timeoutSpy.wait(CarService::kClimateAckTimeoutMs + 800));
+    QCOMPARE(timeoutSpy.count(), 1);
+    QVERIFY(!car.hasPendingClimate());
+    QVERIFY(temp->isEnabled());
+    QVERIFY(!cancel->isEnabled());
+    QCOMPARE(temp->value(), 28);
+    QCOMPARE(status->text(), QStringLiteral("超时未确认，已回滚"));
+}
+
+void TestUiSmoke::climateRejectedSendDoesNotLockUi()
+{
+    CarService car;
+    ClimatePage page(&car);
+    page.show();
+    QCoreApplication::processEvents();
+    auto *temp = findSlider(page, 16);
+    auto *cancel = page.findChild<QPushButton *>(QStringLiteral("cancelPending"));
+    auto *status = page.findChild<QLabel *>(QStringLiteral("statusPill"));
+    QVERIFY(temp && cancel && status);
+
+    // A request owned by another caller makes the UI send return 0.
+    ClimateState target = car.climate();
+    target.temperature = 24;
+    const quint32 externalId = car.sendClimateCommand(target);
+    QVERIFY(externalId != 0);
+    temp->setValue(28);
+    QTRY_COMPARE(status->text(), QStringLiteral("发送失败，已回滚"));
+    QVERIFY(car.hasPendingClimate());
+    QVERIFY(temp->isEnabled());
+    QVERIFY(!cancel->isEnabled());
+    QCOMPARE(temp->value(), 22);
+    QVERIFY(car.cancelClimateCommand(externalId));
+    QCOMPARE(status->text(), QStringLiteral("发送失败，已回滚"));
+
+    // The rejected send must not prevent the next UI request from succeeding.
+    temp->setValue(26);
+    QTRY_VERIFY(car.hasPendingClimate());
+    QVERIFY(!temp->isEnabled());
+    QVERIFY(cancel->isEnabled());
+    const QHash<QString, double> echo = {
+        {QStringLiteral("temp_set"), 26.0},
+        {QStringLiteral("fan_speed"), 3.0},
+        {QStringLiteral("blow_mode"), 0.0},
+        {QStringLiteral("ac_on"), 1.0},
+        {QStringLiteral("auto_mode"), 0.0},
+        {QStringLiteral("ack"), 1.0}
+    };
+    QByteArray payload;
+    QVERIFY(car.parser()->encode(FrameId::HVAC, echo, &payload));
+    car.onCanFrame(FrameId::HVAC, payload);
+    QVERIFY(!car.hasPendingClimate());
+    QVERIFY(temp->isEnabled());
+    QVERIFY(!cancel->isEnabled());
+    QCOMPARE(temp->value(), 26);
+    QCOMPARE(status->text(), QStringLiteral("已确认"));
+
+    temp->setValue(30);
+    QTRY_VERIFY(car.hasPendingClimate());
+    car.stop();
+    QVERIFY(!car.hasPendingClimate());
+    QVERIFY(temp->isEnabled());
+    QVERIFY(!cancel->isEnabled());
+    QCOMPARE(temp->value(), 26);
+    QCOMPARE(status->text(), QStringLiteral("已取消"));
 }
 
 void TestUiSmoke::simulatorDrivesInstrument()

@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -114,6 +115,122 @@ void encodeDecodeRoundTrip200()
     CHECK(decoded["ac_on"] > 0.5);
 }
 
+void signalLayoutBoundaries()
+{
+    struct TestCase {
+        int startBit;
+        int bitLength;
+        bool bigEndian;
+        double value;
+        const char *hex;
+    };
+    const TestCase cases[] = {
+        { 7, 2, false, 3.0, "8001" },
+        { 15, 2, false, 3.0, "008001" },
+        // DBC Motorola start bits use the actual bit index (7 is the MSB).
+        { 7, 16, true, 4660.0, "1234" },
+        { 0, 2, true, 3.0, "0180" },
+        { 3, 12, true, 2748.0, "0abc" },
+        { 8, 2, true, 3.0, "000180" },
+        // Last legal bits and maximum-width signals in classic CAN.
+        { 63, 1, false, 1.0, "0000000000000080" },
+        { 56, 1, true, 1.0, "0000000000000001" },
+        { 63, 8, true, 171.0, "00000000000000ab" },
+        { 1, 63, false, 4660.0, "6824000000000000" },
+        { 6, 63, true, 4660.0, "0000000000001234" },
+        { 0, 64, false, 4660.0, "3412000000000000" },
+        { 7, 64, true, 4660.0, "0000000000001234" },
+    };
+    for (const TestCase &test : cases) {
+        sc::CanSignalDef def;
+        def.name = "signal";
+        def.startBit = test.startBit;
+        def.bitLength = test.bitLength;
+        def.bigEndian = test.bigEndian;
+        const auto expected = fromHex(test.hex);
+        CHECK_NEAR(sc::CanFrameParserCore::decodeSignal(def, expected), test.value);
+
+        std::vector<std::uint8_t> encoded;
+        CHECK(sc::CanFrameParserCore::encodeSignal(def, test.value, &encoded));
+        CHECK(encoded == expected); // Assert wire bytes, not just a round trip.
+
+        auto truncated = expected;
+        truncated.pop_back();
+        CHECK_NEAR(sc::CanFrameParserCore::decodeSignal(def, truncated), 0.0);
+
+        sc::CanFrameParserCore parser;
+        const std::string dbc =
+            "BO_ 1536 Layout: 8 ECU\n"
+            " SG_ earlier : 0|1@1+ (1,0) [0|1] \"\" ECU\n"
+            " SG_ signal : " + std::to_string(test.startBit) + "|" +
+            std::to_string(test.bitLength) + (test.bigEndian ? "@0+" : "@1+") +
+            " (1,0) [0|65535] \"\" ECU\n";
+        CHECK(parser.loadDbcText(dbc));
+        const std::unordered_map<std::string, double> previous = {
+            { "signal", -1.0 }, { "keep", 42.0 }
+        };
+        auto values = previous;
+        CHECK(!parser.decode(1536, truncated, &values));
+        CHECK(values == previous);
+        CHECK(!parser.decode(1537, expected, &values));
+        CHECK(values == previous);
+        CHECK(parser.decode(1536, expected, &values));
+        CHECK_NEAR(values["signal"], test.value);
+        CHECK(values.count("keep") == 0);
+    }
+}
+
+void invalidSignalLayoutsRejected()
+{
+    struct TestCase {
+        int startBit;
+        int bitLength;
+    };
+    const std::vector<TestCase> invalid = {
+        { -1, 1 }, { 64, 1 },
+        { std::numeric_limits<int>::min(), 1 },
+        { std::numeric_limits<int>::max(), 1 },
+        { 0, 0 }, { 0, -1 }, { 0, 65 },
+        { 0, std::numeric_limits<int>::min() },
+        { 0, std::numeric_limits<int>::max() },
+        { 8, 64 },
+    };
+    for (bool bigEndian : { false, true }) {
+        auto cases = invalid;
+        // These spill into byte 9 despite having start/length in range.
+        cases.push_back({ bigEndian ? 56 : 63, 2 });
+        cases.push_back({ bigEndian ? 6 : 1, 64 });
+        for (const TestCase &test : cases) {
+            sc::CanSignalDef def;
+            def.startBit = test.startBit;
+            def.bitLength = test.bitLength;
+            def.bigEndian = bigEndian;
+            def.isSigned = true;
+            def.offset = 10.0;
+            // Even an oversized input buffer must not admit invalid CAN layouts.
+            CHECK_NEAR(sc::CanFrameParserCore::decodeSignal(
+                           def, std::vector<std::uint8_t>(16, 0xff)), 0.0);
+            CHECK_NEAR(sc::CanFrameParserCore::decodeSignal(def, {}), 0.0);
+            auto output = fromHex("a55ac3");
+            const auto previous = output;
+            CHECK(!sc::CanFrameParserCore::encodeSignal(def, 11.0, &output));
+            CHECK(output == previous);
+            std::vector<std::uint8_t> empty;
+            CHECK(!sc::CanFrameParserCore::encodeSignal(def, 11.0, &empty));
+            CHECK(empty.empty());
+
+            sc::CanFrameParserCore parser;
+            const std::string dbc =
+                "BO_ 1536 Invalid: 8 ECU\n"
+                " SG_ invalid : " + std::to_string(test.startBit) + "|" +
+                std::to_string(test.bitLength) + (bigEndian ? "@0-" : "@1-") +
+                " (1,10) [0|65535] \"\" ECU\n";
+            CHECK(!parser.loadDbcText(dbc));
+            CHECK(parser.signalDefs(1536).empty());
+        }
+    }
+}
+
 void loggerWritesFile()
 {
     namespace fs = std::filesystem;
@@ -143,6 +260,8 @@ int main()
     truncatedFrameRejected();
     dbcTextOverridesBuiltins();
     encodeDecodeRoundTrip200();
+    signalLayoutBoundaries();
+    invalidSignalLayoutsRejected();
     loggerWritesFile();
 
     if (g_failures != 0) {

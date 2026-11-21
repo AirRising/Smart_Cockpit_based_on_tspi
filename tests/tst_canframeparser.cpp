@@ -13,6 +13,8 @@ private slots:
     void truncatedFrameRejected();
     void loadDbcText();
     void encodeFrame200();
+    void signalLayoutBoundaries_data();
+    void signalLayoutBoundaries();
 };
 
 void TestCanFrameParser::decodeFrame100()
@@ -93,6 +95,49 @@ void TestCanFrameParser::encodeFrame200()
     QCOMPARE(decoded.value(QStringLiteral("temp_set")), 24.0);
     QCOMPARE(decoded.value(QStringLiteral("fan_speed")), 3.0);
     QVERIFY(decoded.value(QStringLiteral("ac_on")) > 0.5);
+}
+
+void TestCanFrameParser::signalLayoutBoundaries_data()
+{
+    QTest::addColumn<QString>("layout");
+    QTest::addColumn<QByteArray>("payload");
+    QTest::addColumn<double>("value");
+    QTest::newRow("intel-7-2")
+        << QStringLiteral("7|2@1+") << QByteArray::fromHex("8001") << 3.0;
+    QTest::newRow("motorola-7-16")
+        << QStringLiteral("7|16@0+") << QByteArray::fromHex("1234") << 4660.0;
+    QTest::newRow("motorola-0-2")
+        << QStringLiteral("0|2@0+") << QByteArray::fromHex("0180") << 3.0;
+    QTest::newRow("motorola-3-12")
+        << QStringLiteral("3|12@0+") << QByteArray::fromHex("0abc") << 2748.0;
+}
+
+void TestCanFrameParser::signalLayoutBoundaries()
+{
+    QFETCH(QString, layout);
+    QFETCH(QByteArray, payload);
+    QFETCH(double, value);
+    CanFrameParser parser;
+    QVERIFY(parser.loadDbcText(QStringLiteral(
+        "BO_ 1536 Layout: 8 ECU\n"
+        " SG_ earlier : 0|1@1+ (1,0) [0|1] \"\" ECU\n"
+        " SG_ signal : %1 (1,0) [0|65535] \"\" ECU\n").arg(layout)));
+
+    const QHash<QString, double> previous = {
+        { QStringLiteral("signal"), -1.0 }, { QStringLiteral("keep"), 42.0 }
+    };
+    auto values = previous;
+    QVERIFY(!parser.decode(1536, payload.left(payload.size() - 1), &values));
+    QVERIFY(values == previous);
+    QVERIFY(parser.decode(1536, payload, &values));
+    QCOMPARE(values.value(QStringLiteral("signal")), value);
+    QVERIFY(!values.contains(QStringLiteral("keep")));
+
+    QHash<QString, double> toEncode;
+    toEncode.insert(QStringLiteral("signal"), value);
+    QByteArray encoded;
+    QVERIFY(parser.encode(1536, toEncode, &encoded));
+    QCOMPARE(encoded, payload.leftJustified(8, '\0'));
 }
 
 QTEST_GUILESS_MAIN(TestCanFrameParser)

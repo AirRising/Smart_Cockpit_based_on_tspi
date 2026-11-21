@@ -10,6 +10,10 @@ add_executable(tst_canframeparser tst_canframeparser.cpp)
 target_link_libraries(tst_canframeparser PRIVATE smart_cockpit_core ${QT_TEST_PKG}::Test)
 add_test(NAME tst_canframeparser COMMAND tst_canframeparser)
 
+add_executable(tst_cameraservice tst_cameraservice.cpp)
+target_link_libraries(tst_cameraservice PRIVATE smart_cockpit_core ${QT_TEST_PKG}::Test)
+add_test(NAME tst_cameraservice COMMAND tst_cameraservice)
+
 add_executable(tst_climateservice tst_climateservice.cpp)
 target_link_libraries(tst_climateservice PRIVATE smart_cockpit_core ${QT_TEST_PKG}::Test)
 add_test(NAME tst_climateservice COMMAND tst_climateservice)
