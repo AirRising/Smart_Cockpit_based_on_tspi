@@ -3,11 +3,20 @@
 #include <QFont>
 #include <QFontMetrics>
 #include <QPainter>
-#include <QPainterPath>
-#include <QRadialGradient>
+#include <QResizeEvent>
 #include <QtMath>
 
+#include "Theme.h"
+
 namespace sc {
+
+namespace {
+
+constexpr double kStartAngleDeg = 225.0; // bottom-left
+constexpr double kEndAngleDeg = -45.0;   // bottom-right
+constexpr double kSweepDeg = 270.0;
+
+} // namespace
 
 GaugeWidget::GaugeWidget(QWidget *parent)
     : QWidget(parent)
@@ -24,12 +33,14 @@ void GaugeWidget::configure(double minValue, double maxValue, const QString &uni
     m_redline = redline;
     m_majorTicks = majorTicks;
     m_precision = precision;
+    rebuildCache();
     update();
 }
 
 void GaugeWidget::setLabel(const QString &label)
 {
     m_label = label;
+    rebuildCache();
     update();
 }
 
@@ -39,12 +50,6 @@ void GaugeWidget::setValue(double value)
     update();
 }
 
-QRectF GaugeWidget::dialRect() const
-{
-    const qreal side = qMin(width(), height()) - 8.0;
-    return QRectF((width() - side) / 2.0, (height() - side) / 2.0, side, side);
-}
-
 double GaugeWidget::valueFraction() const
 {
     return (m_value - m_min) / qMax(1.0, m_max - m_min);
@@ -52,184 +57,185 @@ double GaugeWidget::valueFraction() const
 
 double GaugeWidget::valueAngleDeg() const
 {
-    return 225.0 - valueFraction() * 270.0;
+    return kStartAngleDeg - valueFraction() * kSweepDeg;
+}
+
+QColor GaugeWidget::valueColor() const
+{
+    if (m_redline > m_min && m_value >= m_redline)
+        return QColor(QLatin1String(Theme::Err));
+    return QColor(QLatin1String(Theme::Accent));
+}
+
+void GaugeWidget::resizeEvent(QResizeEvent *event)
+{
+    rebuildCache();
+    QWidget::resizeEvent(event);
+}
+
+// Renders the whole static layer (face, track, redline, ticks, numbers,
+// label) plus all per-frame geometry into members. Runs on resize and on
+// configure()/setLabel() only -- never per value change.
+void GaugeWidget::rebuildCache()
+{
+    m_staticLayer = QPixmap();
+    if (width() < 40 || height() < 40)
+        return;
+
+    const qreal dpr = devicePixelRatioF();
+    m_staticLayer = QPixmap(size() * dpr);
+    m_staticLayer.setDevicePixelRatio(dpr);
+    m_staticLayer.fill(Qt::transparent);
+
+    // Geometry shared by the static layer and the per-frame drawing.
+    const qreal side = qMin<qreal>(width(), height()) - 16.0;
+    const QRectF dial((width() - side) / 2.0, (height() - side) / 2.0, side, side);
+    m_center = dial.center();
+    m_radius = dial.width() / 2.0;
+    const qreal cx = m_center.x();
+    const qreal cy = m_center.y();
+    const qreal r = m_radius;
+
+    const QRectF face = dial.adjusted(r * 0.10, r * 0.10, -r * 0.10, -r * 0.10);
+    m_arcPenWidth = qMax(4.0, r * 0.055);
+    const qreal arcR = face.width() / 2.0 - m_arcPenWidth / 2.0 - 2.0;
+    m_arcRect = QRectF(cx - arcR, cy - arcR, 2.0 * arcR, 2.0 * arcR);
+
+    // Needle path points straight up; paintEvent translates to the hub and
+    // rotates it into place, so no path is ever built per frame.
+    const qreal needleLen = arcR - m_arcPenWidth * 1.2;
+    const qreal baseHalf = qMax(2.0, r * 0.035);
+    m_needlePath = QPainterPath();
+    m_needlePath.moveTo(-baseHalf, r * 0.12);
+    m_needlePath.lineTo(baseHalf, r * 0.12);
+    m_needlePath.lineTo(0.0, -needleLen);
+    m_needlePath.closeSubpath();
+
+    // Readout fonts and target rects (content is drawn per frame).
+    m_valueFont = Theme::monoFont(qMax(18, int(r * 0.30)), QFont::Bold);
+    m_unitFont = Theme::monoFont(qMax(10, int(r * 0.10)), QFont::DemiBold);
+    m_valueRect = QRectF(cx - r, cy + r * 0.10, 2.0 * r, r * 0.40);
+    m_unitRect = QRectF(cx - r, cy + r * 0.52, 2.0 * r, r * 0.18);
+
+    // ------------------------------------------------------- static layer
+    QPainter painter(&m_staticLayer);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    // Dial face.
+    painter.setPen(QPen(QColor(QLatin1String(Theme::CardBorder)), 1.2));
+    painter.setBrush(QColor(QLatin1String(Theme::Card)));
+    painter.drawEllipse(face);
+
+    // Arc track.
+    painter.setBrush(Qt::NoBrush);
+    painter.setPen(QPen(QColor(QLatin1String(Theme::CardBorder)), m_arcPenWidth,
+                        Qt::SolidLine, Qt::RoundCap));
+    painter.drawArc(m_arcRect, int(kStartAngleDeg * 16), int(-kSweepDeg * 16));
+
+    // Redline zone.
+    if (m_redline > m_min && m_redline < m_max) {
+        const double redStart =
+            kStartAngleDeg - (m_redline - m_min) / (m_max - m_min) * kSweepDeg;
+        painter.setPen(QPen(QColor(QLatin1String(Theme::Err)), m_arcPenWidth,
+                            Qt::SolidLine, Qt::RoundCap));
+        painter.drawArc(m_arcRect, qRound(redStart * 16),
+                        qRound((kEndAngleDeg - redStart) * 16));
+    }
+
+    // Ticks (inside the arc).
+    const qreal tickOuter = arcR - m_arcPenWidth - 2.0;
+    const qreal majorLen = r * 0.07;
+    const qreal minorLen = r * 0.035;
+    const int minor = m_majorTicks * 2;
+    for (int i = 0; i <= minor; ++i) {
+        const double angleRad =
+            qDegreesToRadians(kStartAngleDeg - double(i) / minor * kSweepDeg);
+        const bool isMajor = (i % 2 == 0);
+        const qreal len = isMajor ? majorLen : minorLen;
+        painter.setPen(QPen(isMajor ? QColor(QLatin1String(Theme::TextSecondary))
+                                    : QColor(QLatin1String(Theme::Disabled)),
+                            isMajor ? 2.0 : 1.0));
+        painter.drawLine(QPointF(cx + qCos(angleRad) * (tickOuter - len),
+                                 cy - qSin(angleRad) * (tickOuter - len)),
+                         QPointF(cx + qCos(angleRad) * tickOuter,
+                                 cy - qSin(angleRad) * tickOuter));
+    }
+
+    // Numbers (every other major tick, like before).
+    QFont numberFont = Theme::monoFont(qMax(9, int(r * 0.075)), QFont::DemiBold);
+    painter.setFont(numberFont);
+    painter.setPen(QColor(QLatin1String(Theme::TextSecondary)));
+    const QFontMetricsF metrics(numberFont);
+    const qreal numberRadius = tickOuter - majorLen - r * 0.10;
+    const double step = (m_max - m_min) / m_majorTicks;
+    for (int i = 0; i <= m_majorTicks; i += 2) {
+        const double value = m_min + i * step;
+        const double angleRad = qDegreesToRadians(
+            kStartAngleDeg - double(i) / m_majorTicks * kSweepDeg);
+        const QString text = QString::number(value, 'f', m_precision);
+        QRectF textRect = metrics.boundingRect(text);
+        textRect.moveCenter(QPointF(cx + qCos(angleRad) * numberRadius,
+                                    cy - qSin(angleRad) * numberRadius));
+        painter.drawText(textRect, Qt::AlignCenter, text);
+    }
+
+    // Label above the hub.
+    if (!m_label.isEmpty()) {
+        QFont labelFont = font();
+        labelFont.setPixelSize(qMax(11, int(r * 0.11)));
+        labelFont.setWeight(QFont::DemiBold);
+        painter.setFont(labelFont);
+        painter.setPen(QColor(QLatin1String(Theme::TextSecondary)));
+        painter.drawText(QRectF(cx - r, cy - r * 0.62, 2.0 * r, r * 0.20),
+                         Qt::AlignCenter, m_label);
+    }
 }
 
 void GaugeWidget::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event)
+    if (m_staticLayer.isNull())
+        rebuildCache();
+    if (m_staticLayer.isNull())
+        return;
+
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
+    painter.drawPixmap(0, 0, m_staticLayer);
 
-    const QRectF dial = dialRect();
-    const qreal cx = dial.center().x();
-    const qreal cy = dial.center().y();
-    const qreal r = dial.width() / 2.0;
+    const QColor color = valueColor();
 
-    // Outer rim with a subtle radial gradient ring.
-    QRadialGradient rim(cx, cy, r);
-    rim.setColorAt(0.0, QColor(0x23, 0x2D, 0x40));
-    rim.setColorAt(0.7, QColor(0x16, 0x1C, 0x2A));
-    rim.setColorAt(1.0, QColor(0x0A, 0x0D, 0x14));
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(rim);
-    painter.drawEllipse(dial);
-
-    // Inner face.
-    const QRectF face = dial.adjusted(r * 0.14, r * 0.14, -r * 0.14, -r * 0.14);
-    painter.setPen(QPen(QColor(0x2A, 0x35, 0x50), 1.2));
-    painter.setBrush(QColor(0x0C, 0x11, 0x1B));
-    painter.drawEllipse(face);
-
-    // Arc track.
-    const qreal arcR = face.width() / 2.0 - r * 0.10;
-    const QRectF arcRect(cx - arcR, cy - arcR, 2.0 * arcR, 2.0 * arcR);
-    const qreal penW = r * 0.095;
-
-    painter.setPen(QPen(QColor(0x22, 0x2B, 0x3D), penW, Qt::SolidLine, Qt::RoundCap));
-    painter.drawArc(arcRect, 225 * 16, -270 * 16);
-
-    // Redline zone.
-    if (m_redline > m_min && m_redline < m_max) {
-        const double redStart = 225.0 - (m_redline - m_min) / (m_max - m_min) * 270.0;
-        painter.setPen(QPen(QColor(0xFF, 0x4D, 0x4F, 220), penW, Qt::SolidLine, Qt::RoundCap));
-        painter.drawArc(arcRect, qRound(redStart * 16), qRound((-45.0 - redStart) * 16));
-    }
-
-    // Active value arc (neon glow underneath a solid accent).
+    // Value arc.
     if (m_value > m_min) {
-        const int span = qRound((valueAngleDeg() - 225.0) * 16);
-        const QColor accent = (m_redline > 0 && m_value >= m_redline)
-                                  ? QColor(0xFF, 0x4D, 0x4F)
-                                  : QColor(0x29, 0xD3, 0xF0);
-        painter.setPen(QPen(QColor(accent.red(), accent.green(), accent.blue(), 50),
-                            penW * 1.9, Qt::SolidLine, Qt::RoundCap));
-        painter.drawArc(arcRect, 225 * 16, span);
-        painter.setPen(QPen(accent, penW, Qt::SolidLine, Qt::RoundCap));
-        painter.drawArc(arcRect, 225 * 16, span);
+        const int span = qRound((valueAngleDeg() - kStartAngleDeg) * 16.0);
+        painter.setPen(QPen(color, m_arcPenWidth, Qt::SolidLine, Qt::RoundCap));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawArc(m_arcRect, int(kStartAngleDeg * 16), span);
     }
 
-    drawTicks(painter, dial, face);
-    drawNumbers(painter, dial, face);
-    drawNeedle(painter, cx, cy, r, valueAngleDeg());
-    drawValue(painter, cx, cy, r);
-}
-
-void GaugeWidget::drawTicks(QPainter &painter, const QRectF &dial, const QRectF &face)
-{
-    const qreal cx = dial.center().x();
-    const qreal cy = dial.center().y();
-    const qreal r = dial.width() / 2.0;
-    const qreal outer = face.width() / 2.0 - r * 0.06;
-    const qreal majorLen = r * 0.11;
-    const qreal minorLen = r * 0.055;
-
-    const int major = m_majorTicks;
-    const int minor = major * 2;
-
-    for (int i = 0; i <= minor; ++i) {
-        const double frac = double(i) / minor;
-        const double angleRad = qDegreesToRadians(225.0 - frac * 270.0);
-        const bool isMajor = (i % 2 == 0);
-        const qreal len = isMajor ? majorLen : minorLen;
-        painter.setPen(QPen(isMajor ? QColor(0xC7, 0xD0, 0xE0)
-                                    : QColor(0x3A, 0x4A, 0x70, 180),
-                            isMajor ? 2.0 : 1.0));
-        painter.drawLine(QPointF(cx + qCos(angleRad) * (outer - len),
-                                 cy - qSin(angleRad) * (outer - len)),
-                         QPointF(cx + qCos(angleRad) * outer,
-                                 cy - qSin(angleRad) * outer));
-    }
-}
-
-void GaugeWidget::drawNumbers(QPainter &painter, const QRectF &dial, const QRectF &face)
-{
-    const qreal cx = dial.center().x();
-    const qreal cy = dial.center().y();
-    const qreal r = dial.width() / 2.0;
-    const qreal radius = face.width() / 2.0 - r * 0.22;
-
-    QFont f = font();
-    f.setPixelSize(qMax(9, int(r * 0.08)));
-    f.setWeight(QFont::DemiBold);
-    painter.setFont(f);
-    painter.setPen(QColor(0x9A, 0xA8, 0xC0));
-
-    const QFontMetricsF metrics(f);
-    const double step = (m_max - m_min) / m_majorTicks;
-    for (int i = 0; i <= m_majorTicks; i += 2) {
-        const double value = m_min + i * step;
-        const double angleRad = qDegreesToRadians(225.0 - double(i) / m_majorTicks * 270.0);
-        const qreal x = cx + qCos(angleRad) * radius;
-        const qreal y = cy - qSin(angleRad) * radius;
-        const QString text = QString::number(value, 'f', m_precision);
-
-        QRectF textRect = metrics.boundingRect(text);
-        textRect.moveCenter(QPointF(x, y));
-        painter.drawText(textRect, Qt::AlignCenter, text);
-    }
-}
-
-void GaugeWidget::drawNeedle(QPainter &painter, qreal cx, qreal cy, qreal r, double angleDeg)
-{
-    const qreal angleRad = qDegreesToRadians(angleDeg);
-    const qreal len = r * 0.58;
-    const qreal baseHalf = r * 0.045;
-    const qreal baseY = cy + r * 0.30;
-
-    const QColor color = (m_redline > 0 && m_value >= m_redline)
-                             ? QColor(0xFF, 0x4D, 0x4F)
-                             : QColor(0x7F, 0xE6, 0xFF);
-
-    QPainterPath needle;
-    needle.moveTo(cx - baseHalf, baseY);
-    needle.lineTo(cx + baseHalf, baseY);
-    needle.lineTo(cx + qCos(angleRad) * len, cy - qSin(angleRad) * len);
-    needle.closeSubpath();
-
-    QLinearGradient grad(cx, baseY, cx, cy - len);
-    grad.setColorAt(0.0, color);
-    grad.setColorAt(1.0, QColor(0x29, 0xD3, 0xF0));
+    // Needle: pre-built path, only translate + rotate per frame.
+    painter.save();
+    painter.translate(m_center);
+    painter.rotate(90.0 - valueAngleDeg());
     painter.setPen(Qt::NoPen);
-    painter.setBrush(grad);
-    painter.drawPath(needle);
+    painter.setBrush(color);
+    painter.drawPath(m_needlePath);
+    painter.restore();
 
-    // Center hub.
-    QRadialGradient hub(cx, cy, r * 0.09);
-    hub.setColorAt(0.0, QColor(0xEA, 0xF0, 0xF8));
-    hub.setColorAt(0.6, color);
-    hub.setColorAt(1.0, QColor(0x0A, 0x0D, 0x14));
-    painter.setBrush(hub);
-    painter.drawEllipse(QPointF(cx, cy), r * 0.075, r * 0.075);
-}
+    // Hub.
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(QLatin1String(Theme::TextPrimary)));
+    painter.drawEllipse(m_center, m_radius * 0.035, m_radius * 0.035);
 
-void GaugeWidget::drawValue(QPainter &painter, qreal cx, qreal cy, qreal r)
-{
-    if (!m_label.isEmpty()) {
-        QFont labelFont = font();
-        labelFont.setPixelSize(qMax(10, int(r * 0.15)));
-        labelFont.setWeight(QFont::Bold);
-        painter.setFont(labelFont);
-        painter.setPen(QColor(0x29, 0xD3, 0xF0));
-        painter.drawText(QRectF(cx - r, cy - r * 0.60, 2.0 * r, r * 0.22),
-                         Qt::AlignCenter, m_label);
-    }
+    // Digital readout (monospaced digits -> no width jitter).
+    painter.setFont(m_valueFont);
+    painter.setPen(QColor(QLatin1String(Theme::TextPrimary)));
+    painter.drawText(m_valueRect, Qt::AlignCenter,
+                     QString::number(m_value, 'f', m_precision));
 
-    QFont valueFont = font();
-    valueFont.setPixelSize(qMax(15, int(r * 0.27)));
-    valueFont.setWeight(QFont::Bold);
-    painter.setFont(valueFont);
-    painter.setPen(QColor(0xEA, 0xF0, 0xF8));
-    painter.drawText(QRectF(cx - r, cy + r * 0.38, 2.0 * r, r * 0.32),
-                     Qt::AlignCenter, QString::number(m_value, 'f', m_precision));
-
-    QFont unitFont = font();
-    unitFont.setPixelSize(qMax(10, int(r * 0.12)));
-    unitFont.setWeight(QFont::DemiBold);
-    painter.setFont(unitFont);
-    painter.setPen(QColor(0x8A, 0x94, 0xA8));
-    painter.drawText(QRectF(cx - r, cy + r * 0.70, 2.0 * r, r * 0.18),
-                     Qt::AlignCenter, m_unit.toUpper());
+    painter.setFont(m_unitFont);
+    painter.setPen(QColor(QLatin1String(Theme::TextSecondary)));
+    painter.drawText(m_unitRect, Qt::AlignCenter, m_unit.toUpper());
 }
 
 } // namespace sc

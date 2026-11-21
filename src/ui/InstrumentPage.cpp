@@ -3,30 +3,91 @@
 #include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
-#include <QSizePolicy>
+#include <QLabel>
+#include <QPainter>
 #include <QVBoxLayout>
 
+#include "BatteryWidget.h"
 #include "CarService.h"
 #include "GaugeWidget.h"
+#include "Theme.h"
 
 namespace sc {
 
 namespace {
 
-// Card with an optional title label; returns a ready QVBoxLayout for content.
-QVBoxLayout *makeCard(QWidget *parent, const QString &title)
+// Card with an optional title label.
+QFrame *makeCard(QWidget *parent, const QString &title)
 {
     auto *card = new QFrame(parent);
     card->setObjectName(QStringLiteral("card"));
     auto *layout = new QVBoxLayout(card);
-    layout->setContentsMargins(20, 16, 20, 20);
-    layout->setSpacing(12);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(8);
     if (!title.isEmpty()) {
         auto *label = new QLabel(title, card);
         label->setObjectName(QStringLiteral("cardTitle"));
         layout->addWidget(label);
     }
-    return layout;
+    return card;
+}
+
+// Warning-lamp chip: rounded outline chip with a short text. Off state is a
+// thin disabled-colour outline, on state is a solid semantic colour fill.
+class LampWidget : public QWidget
+{
+public:
+    LampWidget(const QString &text, const QColor &onColor, QWidget *parent = nullptr)
+        : QWidget(parent)
+        , m_text(text)
+        , m_onColor(onColor)
+    {
+        setFixedSize(72, 32);
+    }
+
+    void setOn(bool on)
+    {
+        if (m_on == on)
+            return;
+        m_on = on;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        Q_UNUSED(event)
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+
+        const QRectF chip = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+        if (m_on) {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(m_onColor);
+        } else {
+            painter.setPen(QPen(QColor(QLatin1String(Theme::Disabled)), 1.0));
+            painter.setBrush(Qt::NoBrush);
+        }
+        painter.drawRoundedRect(chip, Theme::RadiusSmall, Theme::RadiusSmall);
+
+        QFont f = font();
+        f.setPixelSize(13);
+        f.setWeight(QFont::DemiBold);
+        painter.setFont(f);
+        painter.setPen(m_on ? QColor(QLatin1String(Theme::Bg))
+                            : QColor(QLatin1String(Theme::TextSecondary)));
+        painter.drawText(rect(), Qt::AlignCenter, m_text);
+    }
+
+private:
+    QString m_text;
+    QColor m_onColor;
+    bool m_on = false;
+};
+
+void setLamp(QWidget *lamp, bool on)
+{
+    static_cast<LampWidget *>(lamp)->setOn(on);
 }
 
 } // namespace
@@ -36,7 +97,6 @@ InstrumentPage::InstrumentPage(CarService *car, QWidget *parent)
     , m_car(car)
 {
     setObjectName(QStringLiteral("instrumentPage"));
-    setStyleSheet(QStringLiteral("#instrumentPage { background: transparent; }"));
 
     m_speedGauge = new GaugeWidget(this);
     m_speedGauge->setObjectName(QStringLiteral("speedGauge"));
@@ -48,56 +108,44 @@ InstrumentPage::InstrumentPage(CarService *car, QWidget *parent)
     m_rpmGauge->configure(0, 8000, QStringLiteral("rpm"), 6000, 8);
     m_rpmGauge->setLabel(QStringLiteral("电机转速"));
 
-    m_fuelGauge = new GaugeWidget(this);
-    m_fuelGauge->setObjectName(QStringLiteral("fuelGauge"));
-    m_fuelGauge->configure(0, 100, QStringLiteral("%"), 15, 10, 0);
-    m_fuelGauge->setLabel(QStringLiteral("电量"));
-    m_fuelGauge->setFixedSize(150, 150);
+    m_battery = new BatteryWidget(this);
+    m_battery->setObjectName(QStringLiteral("batteryWidget"));
+    m_battery->setLabel(QStringLiteral("电量"));
+    m_battery->setFixedHeight(112);
 
+    // ------------------------------------------------------------ gauges
     auto *speedCard = makeCard(this, QString());
-    speedCard->addWidget(m_speedGauge, 1);
+    qobject_cast<QVBoxLayout *>(speedCard->layout())->addWidget(m_speedGauge, 1);
 
     auto *rpmCard = makeCard(this, QString());
-    rpmCard->addWidget(m_rpmGauge, 1);
+    qobject_cast<QVBoxLayout *>(rpmCard->layout())->addWidget(m_rpmGauge, 1);
 
-    auto *statusLayout = makeCard(this, QStringLiteral("车辆状态"));
+    // -------------------------------------------------------- status card
+    auto *statusCard = makeCard(this, QStringLiteral("车辆状态"));
+    auto *statusLayout = qobject_cast<QVBoxLayout *>(statusCard->layout());
 
-    auto *gearCaption = new QLabel(QStringLiteral("挡位"), this);
+    auto *gearCaption = new QLabel(QStringLiteral("挡位"), statusCard);
     gearCaption->setObjectName(QStringLiteral("cardTitle"));
     gearCaption->setAlignment(Qt::AlignCenter);
 
-    m_gearLabel = new QLabel(QStringLiteral("P"), this);
+    m_gearLabel = new QLabel(QStringLiteral("P"), statusCard);
     m_gearLabel->setObjectName(QStringLiteral("gearLabel"));
     m_gearLabel->setAlignment(Qt::AlignCenter);
-    m_gearLabel->setFixedSize(84, 84);
-    m_gearLabel->setStyleSheet(QStringLiteral(
-        "background:#1B1F2E; border:2px solid #FFB400; border-radius:42px;"
-        "color:#FFC24B; font-size:40px; font-weight:800;"));
+    m_gearLabel->setFixedSize(96, 96);
 
     auto *gearBlock = new QVBoxLayout;
     gearBlock->setSpacing(8);
     gearBlock->addWidget(gearCaption);
     gearBlock->addWidget(m_gearLabel, 0, Qt::AlignCenter);
 
-    auto *topRow = new QHBoxLayout;
-    topRow->setSpacing(24);
-    topRow->addLayout(gearBlock, 0);
-    topRow->addWidget(m_fuelGauge, 1, Qt::AlignCenter);
-    statusLayout->addLayout(topRow);
-
-    auto makeLamp = [this](const QString &text, int width = 54) {
-        auto *lamp = new QLabel(text, this);
-        lamp->setAlignment(Qt::AlignCenter);
-        lamp->setFixedSize(width, 30);
-        setLamp(lamp, false);
-        return lamp;
-    };
-    m_leftLamp = makeLamp(QStringLiteral("\u25C0"));
-    m_rightLamp = makeLamp(QStringLiteral("\u25B6"));
-    m_hazardLamp = makeLamp(QStringLiteral("\u25B2"));
-    m_engineLamp = makeLamp(QStringLiteral("电机"));
-    m_absLamp = makeLamp(QStringLiteral("ABS"));
-    m_airbagLamp = makeLamp(QStringLiteral("气囊"), 70);
+    const QColor warn(QLatin1String(Theme::Warn));
+    const QColor err(QLatin1String(Theme::Err));
+    m_leftLamp = new LampWidget(QStringLiteral("◀"), warn, statusCard);
+    m_rightLamp = new LampWidget(QStringLiteral("▶"), warn, statusCard);
+    m_hazardLamp = new LampWidget(QStringLiteral("▲"), warn, statusCard);
+    m_engineLamp = new LampWidget(QStringLiteral("电机"), err, statusCard);
+    m_absLamp = new LampWidget(QStringLiteral("ABS"), err, statusCard);
+    m_airbagLamp = new LampWidget(QStringLiteral("气囊"), err, statusCard);
 
     auto *lampGrid = new QGridLayout;
     lampGrid->setSpacing(8);
@@ -107,16 +155,29 @@ InstrumentPage::InstrumentPage(CarService *car, QWidget *parent)
     lampGrid->addWidget(m_engineLamp, 1, 0);
     lampGrid->addWidget(m_absLamp, 1, 1);
     lampGrid->addWidget(m_airbagLamp, 1, 2);
-    lampGrid->setColumnStretch(3, 1);
-    statusLayout->addLayout(lampGrid);
+
+    auto *statusRow = new QHBoxLayout;
+    statusRow->setSpacing(16);
+    statusRow->addStretch(1);
+    statusRow->addLayout(gearBlock, 0);
+    statusRow->addStretch(1);
+    statusRow->addWidget(m_battery, 2);
+    statusRow->addStretch(1);
+    statusRow->addLayout(lampGrid, 0);
+    statusRow->addStretch(1);
+    statusLayout->addStretch(1);
+    statusLayout->addLayout(statusRow);
     statusLayout->addStretch(1);
 
-    auto *mainLayout = new QHBoxLayout(this);
-    mainLayout->setContentsMargins(24, 18, 24, 18);
-    mainLayout->setSpacing(18);
-    mainLayout->addWidget(speedCard->parentWidget(), 3);
-    mainLayout->addWidget(rpmCard->parentWidget(), 3);
-    mainLayout->addWidget(statusLayout->parentWidget(), 2);
+    // ------------------------------------------------------------- layout
+    // Vertical three sections sized by stretch (portrait 800x1280 reference:
+    // ~511 / ~331 / ~220 px inside ~1087 px of content height).
+    auto *mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(24, 16, 24, 16);
+    mainLayout->setSpacing(16);
+    mainLayout->addWidget(speedCard, 47);
+    mainLayout->addWidget(rpmCard, 30);
+    mainLayout->addWidget(statusCard, 20);
 
     connect(car, &CarService::speedChanged, this, &InstrumentPage::onSpeedChanged);
     connect(car, &CarService::rpmChanged, this, &InstrumentPage::onRpmChanged);
@@ -146,7 +207,7 @@ void InstrumentPage::onRpmChanged(int rpm)
 
 void InstrumentPage::onFuelChanged(double percent)
 {
-    m_fuelGauge->setValue(percent);
+    m_battery->setValue(percent);
 }
 
 void InstrumentPage::onIndicators(bool left, bool right, bool hazard)
@@ -167,19 +228,6 @@ void InstrumentPage::onGearChanged(int position)
 {
     static const char *gearNames[] = {"P", "R", "N", "D"};
     m_gearLabel->setText(QLatin1String(gearNames[qBound(0, position, 3)]));
-}
-
-void InstrumentPage::setLamp(QLabel *lamp, bool on)
-{
-    if (on) {
-        lamp->setStyleSheet(QStringLiteral(
-            "background:#7A3B00; color:#FFC24B; border:1px solid #FFB400;"
-            "border-radius:12px; font-weight:700;"));
-    } else {
-        lamp->setStyleSheet(QStringLiteral(
-            "background:#141A26; color:#4A5468; border:1px solid #1C2434;"
-            "border-radius:12px;"));
-    }
 }
 
 } // namespace sc

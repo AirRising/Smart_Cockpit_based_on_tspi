@@ -1,5 +1,8 @@
 #pragma once
 
+#include <QFont>
+#include <QPainterPath>
+#include <QPixmap>
 #include <QString>
 #include <QWidget>
 
@@ -7,9 +10,14 @@ class QPainter;
 
 namespace sc {
 
-// QPainter-based round gauge: gradient dial, glowing value arc, redline zone,
-// ticks, numbers, tapered needle and digital readout.
-// Used for speed, engine rpm and fuel level.
+// QPainter-based round gauge with a cached static layer.
+//
+// Everything that does not depend on the current value (dial face, arc track,
+// redline zone, ticks, numbers, label) is rendered once into m_staticLayer
+// whenever the widget is resized or reconfigured. Each paint then only blits
+// the cache and draws the value arc, the (pre-built, rotated) needle and the
+// digital readout -- no gradients, paths or font metrics per frame.
+// Used for speed and engine rpm.
 class GaugeWidget : public QWidget
 {
     Q_OBJECT
@@ -25,16 +33,15 @@ public:
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 private:
-    QRectF dialRect() const;
+    void rebuildCache();
     double valueFraction() const;
     double valueAngleDeg() const; // 225 (bottom-left) .. -45 (bottom-right)
-    void drawTicks(QPainter &painter, const QRectF &dial, const QRectF &face);
-    void drawNumbers(QPainter &painter, const QRectF &dial, const QRectF &face);
-    void drawNeedle(QPainter &painter, qreal cx, qreal cy, qreal r, double angleDeg);
-    void drawValue(QPainter &painter, qreal cx, qreal cy, qreal r);
+    QColor valueColor() const;
 
+    // Configuration.
     double m_min = 0.0;
     double m_max = 240.0;
     double m_value = 0.0;
@@ -43,6 +50,18 @@ private:
     int m_precision = 0;
     QString m_unit = QStringLiteral("km/h");
     QString m_label;
+
+    // Cached static layer and geometry (rebuilt on resize/configure).
+    QPixmap m_staticLayer;
+    QRectF m_arcRect;
+    QPointF m_center;
+    qreal m_radius = 0.0;
+    qreal m_arcPenWidth = 1.0;
+    QPainterPath m_needlePath; // points straight up, rotated per frame
+    QFont m_valueFont;
+    QFont m_unitFont;
+    QRectF m_valueRect;
+    QRectF m_unitRect;
 };
 
 } // namespace sc

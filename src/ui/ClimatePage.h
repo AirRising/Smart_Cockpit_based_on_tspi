@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QTimer>
 #include <QWidget>
 
 #include "SystemState.h"
@@ -30,12 +31,16 @@ private slots:
     void onClimateStateChanged(const sc::ClimateState &state);
     void onAckOk(quint32 requestId);
     void onAckTimeout(quint32 requestId);
+    void onCommandCancelled(quint32 requestId);
 
 private:
     sc::ClimateState readControls() const;
     void applyControls(const sc::ClimateState &state);
     void setPanelEnabled(bool enabled, const QString &statusText);
     void updateReadouts();
+    // Fires when the 250 ms debounce window ends: reads the controls and
+    // issues the climate command, then locks the panel until the ack.
+    void issueClimateCommand();
 
     CarService *m_car = nullptr;
     QSlider *m_tempSlider = nullptr;
@@ -46,9 +51,11 @@ private:
     QButtonGroup *m_circGroup = nullptr;
     QPushButton *m_acToggle = nullptr;
     QPushButton *m_autoToggle = nullptr;
+    QPushButton *m_cancelButton = nullptr;
     QLabel *m_statusLabel = nullptr;
+    QTimer m_debounceTimer;
     bool m_syncing = false;
-    bool m_pending = false;
+    quint32 m_pendingRequestId = 0;
     sc::ClimateState m_lastSent;
 };
 

@@ -137,9 +137,9 @@ QPushButton#primary {
 QPushButton#primary:hover { background: #21262D; }
 QPushButton#primary:disabled { color: #484F58; background: #161B22; border-color: #21262D; }
 
-QPushButton#danger { background: #161B22; border: 1px solid #EF4444; color: #EF4444; }
-QPushButton#danger:hover { background: #21262D; }
-QPushButton#danger:disabled { color: #484F58; background: #161B22; border-color: #21262D; }
+QPushButton#cancelPending { background: #161B22; border: 1px solid #EF4444; color: #EF4444; }
+QPushButton#cancelPending:hover { background: #21262D; }
+QPushButton#cancelPending:disabled { color: #484F58; background: #161B22; border-color: #21262D; }
 
 QPushButton#iconBtn {
     border-radius: 12px; font-size: 18px; padding: 0;
