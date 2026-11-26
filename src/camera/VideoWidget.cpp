@@ -1,7 +1,6 @@
 #include "VideoWidget.h"
 
 #include <QPainter>
-#include <QPainterPath>
 
 namespace sc {
 
@@ -17,12 +16,6 @@ void VideoWidget::setFrame(const QImage &frame)
         QMutexLocker locker(&m_frameMutex);
         m_frame = frame;
     }
-    update();
-}
-
-void VideoWidget::setSteeringAngle(double degrees)
-{
-    m_steeringAngle = degrees;
     update();
 }
 
@@ -60,35 +53,6 @@ void VideoWidget::paintGL()
     } else {
         painter.setPen(Qt::white);
         painter.drawText(rect(), Qt::AlignCenter, tr("NO SIGNAL"));
-    }
-
-    drawTrajectory(painter);
-}
-
-void VideoWidget::drawTrajectory(QPainter &painter)
-{
-    const int w = width();
-    const int h = height();
-    const qreal steerNorm = qBound(-1.0, m_steeringAngle / 450.0, 1.0);
-    const qreal baseSpread = w * 0.10;
-    const qreal bottomY = h - 30.0;
-    const qreal topY = h * 0.32;
-    const qreal shift = steerNorm * w * 0.18;
-
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(QPen(QColor(0, 255, 120, 220), 3));
-
-    for (int side : {-1, 1}) {
-        const qreal startX = w / 2.0 + side * baseSpread + shift * 0.4;
-        const qreal endX = w / 2.0 + side * baseSpread * 1.8 + shift;
-        const qreal bulge = w * 0.11 * (1.0 + 0.5 * qAbs(steerNorm));
-
-        QPainterPath path;
-        path.moveTo(startX, bottomY);
-        path.cubicTo(startX + side * bulge, h * 0.72,
-                     endX - side * bulge, h * 0.50,
-                     endX, topY);
-        painter.drawPath(path);
     }
 }
 

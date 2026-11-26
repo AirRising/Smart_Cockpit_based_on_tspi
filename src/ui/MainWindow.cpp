@@ -47,7 +47,7 @@ MainWindow::MainWindow(CarService *car, MediaService *media, CameraService *came
     auto *instrument = new InstrumentPage(car, this);
     auto *mediaPage = new MediaPage(media, this);
     auto *climate = new ClimatePage(car, this);
-    auto *reverse = new ReverseCameraPage(camera, car, this);
+    auto *reverse = new ReverseCameraPage(camera, this);
 
     m_screen->registerPage(sc::PageId::Instrument, instrument);
     m_screen->registerPage(sc::PageId::Media, mediaPage);

@@ -34,7 +34,10 @@ void TestCameraService::streamStartsAndStops()
             [&](const QImage &frame) { lastFrame = frame; });
     QVERIFY(camera.start(QString(), 64, 48, 10));
     QTRY_VERIFY(!lastFrame.isNull());
-    QCOMPARE(lastFrame.size(), QSize(64, 48));
+    // handleSample 顺时针转 90 度（OV5695 出横向帧、面板是 800x1280 竖屏），
+    // 所以送出的帧尺寸是请求尺寸的转置。本断言只钉得住尺寸，钉不住旋转方向：
+    // videotestsrc 的 ball 图案左右上下对称，方向要靠实机画面确认。
+    QCOMPARE(lastFrame.size(), QSize(48, 64));
     QVERIFY(camera.isRunning());
     camera.stop();
     QVERIFY(!camera.isRunning());

@@ -40,6 +40,8 @@ signals:
 
 private:
     void pollStream();
+    void resetTuning();
+    void rebuildTuningLuts();
 
     void *m_pipeline = nullptr; // GstElement*
     void *m_appsink = nullptr;  // GstAppSink*
@@ -49,6 +51,21 @@ private:
     QAtomicInteger<qint64> m_lastFrameMs{0};
     QAtomicInteger<quint64> m_streamGeneration{0};
     bool m_running = false;
+    bool m_hardwareSource = false;
+    QString m_devicePath;
+    int m_fps = 30;
+    int m_restartDelayMs = 2000;
+
+    // 本板 rootfs 的 rkaiq 是 rk3588/ISP3.0 构建，在 RK3566 的 ISP2.1 上初始化
+    // 即段错误，3A 守护进程起不来，ISP 因此不做白平衡也不写 gamma LUT。
+    // 这里在既有的 NV12->RGBA 循环里用查找表补上灰世界白平衡与 gamma。
+    quint8 m_gammaLut[256];
+    quint8 m_lumaLut[256];
+    quint8 m_channelLut[3][256];
+    float m_wbGain[3];
+    float m_lumaGain;
+    quint64 m_statSum[4];
+    quint32 m_statCount;
 };
 
 } // namespace sc

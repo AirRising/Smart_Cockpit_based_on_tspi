@@ -45,7 +45,7 @@ private:
     void *m_playbin = nullptr;      // GstElement*
     void *m_bus = nullptr;          // GstBus*
     QTimer m_pollTimer;
-    QString m_audioSink = QStringLiteral("alsasink");
+    QString m_audioSink = QStringLiteral("autoaudiosink");
     QString m_currentTrack;
     qint64 m_durationMs = -1;
     bool m_playing = false;

@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     app.setStyleSheet(sc::Theme::styleSheet());
 
     QCommandLineParser parser;
-    parser.setApplicationDescription(QStringLiteral("Smart cockpit HMI (Qt Widgets, eglfs/KMS)"));
+    parser.setApplicationDescription(QStringLiteral("Smart cockpit HMI (Qt Widgets, SocketCAN, GStreamer)"));
     parser.addHelpOption();
     parser.addVersionOption();
 

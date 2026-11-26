@@ -128,7 +128,7 @@ void CarService::onCanFrame(quint32 id, const QByteArray &data, bool extended)
     case FrameId::Gear:        handleFrame300(data); break;
     case FrameId::Chassis:     handleFrame400(data); break;
     default:
-        qDebug() << "Unhandled frame 0x" << Qt::hex << id << Qt::dec << data.toHex();
+        qDebug().noquote() << "Unhandled frame 0x" << QString::number(id, 16) << data.toHex();
         break;
     }
 }

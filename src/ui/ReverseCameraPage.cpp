@@ -5,13 +5,11 @@
 #include <QVBoxLayout>
 
 #include "CameraService.h"
-#include "CarService.h"
 #include "VideoWidget.h"
 
 namespace sc {
 
-ReverseCameraPage::ReverseCameraPage(CameraService *camera, CarService *car,
-                                     QWidget *parent)
+ReverseCameraPage::ReverseCameraPage(CameraService *camera, QWidget *parent)
     : QWidget(parent)
 {
     setObjectName(QStringLiteral("reversePage"));
@@ -43,8 +41,6 @@ ReverseCameraPage::ReverseCameraPage(CameraService *camera, CarService *car,
     overlayLayout->addLayout(bottomStrip);
 
     connect(camera, &CameraService::frameReady, m_video, &VideoWidget::setFrame);
-    connect(car, &CarService::steeringAngleChanged,
-            m_video, &VideoWidget::setSteeringAngle);
 }
 
 } // namespace sc

@@ -9,9 +9,8 @@ namespace sc {
 
 // OpenGL-accelerated reverse-view widget.
 //
-// The latest camera frame is uploaded/drawn every paint; the dynamic reverse
-// trajectory (two guide curves derived from the steering angle) is overlaid
-// with QPainter on top of the GL surface.
+// The latest camera frame is uploaded/drawn every paint, scaled to fill the
+// panel while keeping its aspect ratio.
 class VideoWidget : public QOpenGLWidget, protected QOpenGLFunctions
 {
     Q_OBJECT
@@ -20,7 +19,6 @@ public:
 
 public slots:
     void setFrame(const QImage &frame);
-    void setSteeringAngle(double degrees);
 
 protected:
     void initializeGL() override;
@@ -28,11 +26,8 @@ protected:
     void resizeGL(int w, int h) override;
 
 private:
-    void drawTrajectory(QPainter &painter);
-
     QImage m_frame;
     QMutex m_frameMutex;
-    double m_steeringAngle = 0.0;
 };
 
 } // namespace sc
