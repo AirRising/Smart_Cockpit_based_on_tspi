@@ -1,9 +1,14 @@
 {
+  "_comment": [
+    "仅 eglfs/KMS 平台插件读取本文件；泰山派 RK3566 上 eglfs 不可用，本文件不会被加载。",
+    "本板实测显示输出是 DSI-1，模式 800x1280（竖屏），HDMI 口未接屏。",
+    "取值来自板上 xrandr/DRM: card0-DSI-1: 800x1280。换板子必须重新实测，不要沿用。"
+  ],
   "device": "/dev/dri/card0",
   "outputs": [
     {
-      "name": "HDMI-A-1",
-      "mode": "1280x800@60"
+      "name": "DSI-1",
+      "mode": "800x1280"
     }
   ]
 }

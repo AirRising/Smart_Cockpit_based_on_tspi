@@ -1,21 +1,36 @@
 [Unit]
-Description=Smart Cockpit HMI (Qt Widgets, eglfs/KMS)
-After=network-online.target bluetooth.target
+# 泰山派 RK3566 实测：eglfs 平台插件在本板不可用（纯色 QOpenGLWidget 探针也整屏
+# 全黑），linuxfb 又报 cannot mmap framebuffer，因此只能走 X11/xcb。
+# 本单元假设板子已由 lightdm 自动登录到 XFCE 会话（X :0 在跑）。
+Description=Smart Cockpit HMI (Qt Widgets, X11/xcb)
+After=lightdm.service network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=root
-Environment=QT_QPA_PLATFORM=eglfs
-Environment=QT_QPA_EGLFS_ALWAYS_SET_MODE=1
-Environment=QT_QPA_EGLFS_KMS_CONFIG=/etc/smart-cockpit/kms-config.json
+# 不要用 root：普通用户会话才能连上 :0，且 PulseAudio 的 socket 在用户 runtime 目录里。
+User=lckfb
+Group=lckfb
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=QT_QPA_PLATFORM=xcb
+# 本板 Mali 用户态驱动与 eglfs 组合不可用，Qt 走 Mesa 软渲染最稳。
+Environment=LIBGL_ALWAYS_SOFTWARE=1
 Environment=GST_DEBUG=3
 Environment=SMART_COCKPIT_CAN=can0
-ExecStart=/usr/local/bin/smart-cockpit --can can0
+ExecStart=/usr/local/bin/smart-cockpit --can can0 --camera /dev/video0
 Restart=always
 RestartSec=2
 StandardOutput=journal
 StandardError=journal
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=graphical.target
+
+# ---------------------------------------------------------------------------
+# 其他板子（有可用 EGL 平台的）可改回 eglfs 直显，需要同时满足：
+#   QT_QPA_PLATFORM=eglfs
+#   QT_QPA_EGLFS_ALWAYS_SET_MODE=1
+#   QT_QPA_EGLFS_KMS_CONFIG=/etc/smart-cockpit/kms-config.json
+# 泰山派上这组配置的结果是黑屏，不要照抄。
+# ---------------------------------------------------------------------------

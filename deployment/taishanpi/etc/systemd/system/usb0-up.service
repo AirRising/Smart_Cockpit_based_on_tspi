@@ -1,0 +1,14 @@
+[Unit]
+Description=Bring up RNDIS usb0 with fixed IP for host access
+After=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/sbin/ip link set usb0 up
+ExecStart=/sbin/ip addr flush dev usb0
+ExecStart=/sbin/ip addr add 192.168.7.2/24 dev usb0
+
+[Install]
+WantedBy=multi-user.target

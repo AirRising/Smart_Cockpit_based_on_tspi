@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=smart-cockpit
+Exec=/home/lckfb/lab/cockpit-loop.sh
+NoDisplay=true
+Terminal=false
