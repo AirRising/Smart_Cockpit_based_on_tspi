@@ -245,7 +245,9 @@ cmake --build "$WORK/camera-viewer/build" --parallel 2
 阅读 [VideoWidget.cpp](../src/camera/VideoWidget.cpp)、[ReverseCameraPage.cpp](../src/ui/ReverseCameraPage.cpp)。
 VideoWidget 继承 QOpenGLWidget，但 `paintGL()` 内是 QPainter 画 QImage，不是自写 YUV shader。
 它用互斥锁保护保存的图像，拿到副本后绘制；互斥锁不意味着 QWidget 可以跨线程随意调用。
-空图时画 NO SIGNAL，然后仍执行轨迹绘制，不能把“绿线还在”当作信号仍正常。
+空图时画 NO SIGNAL。**（2026-11-26 更新：轨迹线叠加已整块删除，见
+[15 · 泰山派实测记录](15-taishanpi-field-notes.md)；此前它无条件绘制，无信号时只剩两条悬空绿线，
+容易被误判成“绘制残留”。）**
 
 当前目标矩形按宽度计算高度再与窗口求交，不能宣称所有比例都已实现居中的等比留黑。
 在自己的实现中若需要严格等比居中，应单独计算 fit 矩形；本教程未修改项目绘图算法。
@@ -323,7 +325,7 @@ ScreenManager 的 offscreen 测试只验证页面逻辑；offscreen 通过不能
 | 测试源也无帧 | videotestsrc/appsink 插件、管线错误、Qt 事件循环是否运行 |
 | 大约 2.5 秒后 NO SIGNAL | 启动未出帧或后续停帧；保留 cameraError，再手动重试 |
 | 黑窗并提示 OpenGL context 失败 | 显示会话、Qt 平台插件、驱动；不以 offscreen 代替图像验收 |
-| 图像错行或偏色 | NV12 平面、stride、色彩矩阵及 QImage 字节布局 |
+| 图像错行或偏色 | NV12 平面、stride、色彩矩阵及 QImage 字节布局。**实测结论：mainpath 是 full-range（luma 铺到 0..255），要用 Rec.709 full-range 而不是 BT.601 limited；`Format_RGBA8888` 在内存里是 R,G,B,A，小端下打包应为 `0xff000000 \| (b<<16) \| (g<<8) \| r`，写成 `r<<16` 会红蓝互换；本板 rkaiq 3A 不可用，白平衡与 gamma 只能在应用侧做** |
 | stop 后又闪回旧画面 | generation 是否捕获并校验，空图是否确实送达控件 |
 | 真设备协商失败 | 在专用实验机核对支持的格式/尺寸/帧率和访问权限，先回测试源隔离问题 |
 | 退出倒车回到别的普通页 | 检查 QHash 中残留的同优先级请求，不假定存在历史栈 |

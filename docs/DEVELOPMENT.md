@@ -36,11 +36,11 @@
 
 | 约束 | 含义 |
 | --- | --- |
-| 硬件 | 泰山派 RK3566（ARM Cortex-A55，4GB RAM） |
-| 系统 | Debian 11/12 |
-| 显示 | `eglfs + KMS/DRM`，**没有 X11/Wayland**；10.1 寸 800×1280 竖屏 |
+| 硬件 | 泰山派 RK3566（ARM Cortex-A55，**2GB RAM**，16GB eMMC） |
+| 系统 | Ubuntu 20.04，Qt 5.12.8，内核 4.19.232 |
+| 显示 | **只有 X11/xcb 可用**：`eglfs` 纯色探针也整屏全黑，`linuxfb` 报 cannot mmap framebuffer；10.1 寸 800×1280 竖屏（DRM 输出名 `card0-DSI-1`） |
 | 界面 | **纯 C++ + Qt Widgets，禁止 QML**，无图片素材，图标用 Unicode 字符、质感用 QPainter/QSS |
-| 通信 | SocketCAN（`vcan0` 调试 / `can0` 实车） |
+| 通信 | SocketCAN（`vcan0` 已实测收发+ACK；`can0` 实车**未验证**——需外接 CANFD 收发器并在 dts 使能） |
 | 音视频 | GStreamer（MP3 播放 + 摄像头取流） |
 
 ---
@@ -49,8 +49,9 @@
 
 ### 目标设备（泰山派 RK3566）
 
-- 4 核 Cortex-A55，4GB RAM，性能中等，**不能随便开高分辨率特效**
-- 10.1 寸屏幕，用 KMS/DRM 直接驱动（`eglfs` 平台插件），绕开桌面环境
+- 4 核 Cortex-A55，2GB RAM，性能中等，**不能随便开高分辨率特效**
+- 10.1 寸屏幕（DRM 输出 `card0-DSI-1`，800x1280）。本板 `eglfs` 平台插件不可用，
+  实测走 X11/xcb：lightdm 自动登录 `lckfb` 到 XFCE，再在会话里自启应用
 - 所以界面代码不能依赖窗口管理器，必须用 `QMainWindow` 自己管布局
 - 界面全部用 Qt 布局（`QHBoxLayout`/`QVBoxLayout`/`QGridLayout`），可自适应 800×1280 竖屏与横屏窗口
 
@@ -1072,7 +1073,7 @@ cmake --build --preset Cross -j$(nproc)
 | 倒车不抢占页面 | 0x300 byte0 bit0 必须为 1；`0x03` 同时设置 R 挡标签，`0x01` 只置倒车 bit。看日志 `Reverse engaged`；主窗口顶栏/导航仍保留 |
 | 倒车画面显示 NO SIGNAL | stop、EOS/ERROR 或 2500ms 无帧超时会清空画面；查 camera 错误与设备/管线。非空真实路径失败不会回退测试源，需排障后显式重新 start（或重启应用） |
 | 退出倒车没有回到上一页 | 同级活动请求在 QHash 中无最近次序，当前不能保证返回顺序；不是已修复功能（见 7.7） |
-| 中文字体方块 | eglfs 下装 `fonts-noto-cjk` |
+| 中文字体方块 | 装 `fonts-noto-cjk`（与平台插件无关，本板在 xcb 下同样需要） |
 | 仪表刻度数字只显示中间 | 早期版本用固定矩形画刻度数字会裁边；现用 `QFontMetricsF` 计算真实文本矩形（在静态层缓存里绘制，见 7.10） |
 | 温度圆表太小 / 被裁切 | 表盘按 `min(w,h)` 取居中正方形，`sizeHint()` 返回 320×320。注意：加 `Qt::AlignCenter` 对齐标志会阻止控件拉伸、锁死在最小尺寸 |
 | 媒体页曲库是空的 | 本机音乐目录没有 mp3/flac/wav/ogg。用 `--media-dir 你的目录` 指定，或往 `~/Music` 放两个文件 |

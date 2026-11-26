@@ -1,8 +1,8 @@
-# 智能座舱（嵌入式 Linux · SocketCAN · GStreamer · eglfs/KMS · Qt Widgets）
+# 智能座舱（嵌入式 Linux · SocketCAN · GStreamer · X11/xcb · Qt Widgets）
 
 面向车载仪表的嵌入式 Linux 应用，目标硬件：立创泰山派 RK3566（Cortex-A55，
-2+16GB），Debian 11/12，10.1" 800×1280 竖屏。以 `eglfs + KMS/DRM` 直接接管
-显示，**无 X11**；应用层用 C++17 编写，覆盖 SocketCAN 总线收发、GStreamer
+2+16GB），Ubuntu 20.04（Qt 5.12.8），10.1" 800×1280 竖屏。显示走 **X11/xcb**
+（lightdm 自动登录到 XFCE 会话）；应用层用 C++17 编写，覆盖 SocketCAN 总线收发、GStreamer
 音视频管线、异步日志、systemd 部署与 aarch64 交叉编译。UI 层使用 Qt Widgets
 作为渲染与事件框架（**不使用 QML**），界面已中文化（车速 / 电机转速 / 电量等）。
 
@@ -12,7 +12,9 @@
   0x100–0x400；UI 下发指令后等待车辆 ACK，超时自动回滚。
 - **GStreamer 管线**：`playbin` 音频播放；`appsink` 拉取摄像头 NV12 流并转
   RGBA，转换在 streaming 线程完成，不阻塞主渲染线程。
-- **嵌入式显示栈**：eglfs + KMS/DRM 无窗口系统直显，systemd 单元开机自启。
+- **显示栈（泰山派实测）**：`eglfs` 与 `linuxfb` 在本板都不可用，走 X11/xcb +
+  lightdm 自动登录，由桌面会话自启。全部实测结论与踩坑见
+  [15 · 泰山派 RK3566 实测记录](docs/15-taishanpi-field-notes.md)。
 - **交叉编译与部署**：aarch64 工具链 + sysroot 交叉构建，rsync + systemd 一键部署。
 - **健壮性**：异步文件日志（10MB 滚动）、系统状态机（Normal/Degraded/Emergency）、
   内置信号模拟器（无 CAN/vcan 也能完整演示）。
@@ -53,9 +55,10 @@ tspi/
 │   ├── vcan-setup.sh            # 主机端创建 vcan0
 │   └── demo-can.sh              # 向 vcan0 发送模拟帧
 ├── deployment/
-│   ├── smart-cockpit.service    # systemd 单元（eglfs 环境）
-│   ├── kms-config.json
-│   └── deploy.sh                # rsync + systemctl 一键部署
+│   ├── smart-cockpit.service    # systemd 单元（供有可用 EGL 平台的其他板子）
+│   ├── kms-config.json          # 仅 eglfs 读取；本板 eglfs 不可用
+│   ├── deploy.sh                # 部署到泰山派
+│   └── taishanpi/               # 泰山派实测跑通的自启方案（本仓库默认路线）
 ├── config/
 │   └── vehicle.dbc              # 示例 DBC（--dbc 加载，覆盖内置表）
 ├── src/
@@ -199,8 +202,8 @@ cmake --build build-arm -j$(nproc)
 ```
 
 设备侧依赖：`libqt5widgets5 libgstreamer1.0-0 gstreamer1.0-plugins-base
-gstreamer1.0-plugins-good fonts-noto-cjk systemd`，以及 `libqt5gui5` 的 eglfs
-平台插件（**`fonts-noto-cjk` 必须有，否则中文显示为方块**）。R 挡触发依赖 CAN
+gstreamer1.0-plugins-good fonts-noto-cjk systemd`，以及 `libqt5gui5` 的 xcb
+平台插件（本板 eglfs 不可用）（**`fonts-noto-cjk` 必须有，否则中文显示为方块**）。R 挡触发依赖 CAN
 0x300 的 bit0；无 CAN/vcan 时用 `--sim` 演示。
 
 ## 多线程与信号/槽连接

@@ -31,8 +31,8 @@
 | 2 | [CMakePresets.json](../CMakePresets.json) | version 3，需要 CMake 3.21；Cross 输出 build/arm |
 | 3 | [工具链](../cmake/toolchain-aarch64-linux-gnu.cmake) | sysroot、目标库查找；编译器前缀有错误 |
 | 4 | [deploy.sh](../deployment/deploy.sh) | 默认 build-arm，远端直接覆盖，随后 enable/restart |
-| 5 | [smart-cockpit.service](../deployment/smart-cockpit.service) | User=root、eglfs、硬编码 can0 |
-| 6 | [kms-config.json](../deployment/kms-config.json) | card0、HDMI-A-1、1280x800@60 都是固定值 |
+| 5 | [smart-cockpit.service](../deployment/smart-cockpit.service) | 原为 User=root、eglfs、硬编码 can0。**泰山派上 eglfs 不可用、root 拿不到用户 X 会话与 PulseAudio，本板默认改走 [deployment/taishanpi/](../deployment/taishanpi/)** |
+| 6 | [kms-config.json](../deployment/kms-config.json) | 原为 HDMI-A-1、1280x800@60。本板实测是 `DSI-1` 800x1280，且该文件只有 eglfs 会读，本板用不到 |
 | 7 | [main.cpp](../src/main.cpp) | CLI 才决定 can/camera/log-dir；没有 camera 就用测试源 |
 
 已有脚本也须逐个辨认，不能见到“ci/deploy”就直接运行：
@@ -205,7 +205,7 @@ rsync -av "$STAGE/" "$TARGET:smart-cockpit-staging/"
 
 native 路线则在板端将 `$BOARD_BUILD/smart-cockpit` 复制到同名 staging，不经过宿主产物。
 在 staging 的 KMS 副本中按阶段 A 结果修改 device/name/mode，不改仓库文件。
-只有确认硬件恰好匹配时才保留原来的 card0 / HDMI-A-1 / 1280x800@60。
+只有确认硬件恰好匹配时才保留原来的输出名与模式。**泰山派 RK3566 实测是 `card0-DSI-1: 800x1280`，HDMI 口未接屏；照抄 HDMI-A-1 / 1280x800@60 会黑屏。**
 这里仅放二进制和配置，不宣称已带齐依赖；Qt 插件、GST 插件、字体、GPU 驱动仍需匹配。
 
 ## 8. 阶段 C：检查匹配库并前台验证（待硬件验证）
@@ -315,7 +315,7 @@ systemctl is-enabled smart-cockpit
 
 | 现象 | 排查顺序 |
 | --- | --- |
-| 找不到交叉编译器 | 检查前缀末尾 `-`、PATH、完整交叉 build 缓存 |
+| 找不到交叉编译器 | 检查前缀末尾 `-`（**已修**：原 `aarch64-linux-gnu` 缺结尾连字符，会拼出 `aarch64-linux-gnugcc`）、PATH、完整交叉 build 缓存。注意：交叉路线至今未在实机跑通，泰山派上推荐板端原生编译 |
 | moc 无法执行 | 是否误用 ARM moc；宿主工具与目标 Qt 是否匹配 |
 | ELF 存在却无法执行 | file/readelf、解释器路径、glibc/GLIBCXX 与目标 ABI |
 | Qt 平台插件加载失败 | 插件自身依赖、目标 Qt 版本、GPU/EGL 驱动，不只查 libQt5Widgets |

@@ -22,7 +22,7 @@
 
 ## 2. 推荐环境
 
-主线推荐带桌面的 Ubuntu 22.04 或更新版本、Debian 12，使用 C++17、Qt 5.15、CMake ≥ 3.21。项目 [CMake 配置](../CMakeLists.txt) 虽声明 CMake ≥ 3.16、Qt5 ≥ 5.12，但当前源码中的 `Qt::hex/dec` 需要 Qt ≥ 5.14，本文的 `ctest --test-dir` 需要 CMake ≥ 3.20；声明的最低版本不代表已验证兼容。[构建预设](../CMakePresets.json) 也需要 CMake ≥ 3.21。本教程用显式 `-S/-B` 命令，统一采用上述推荐版本。
+主线推荐带桌面的 Ubuntu 22.04 或更新版本、Debian 12，使用 C++17、Qt 5.15、CMake ≥ 3.21。项目 [CMake 配置](../CMakeLists.txt) 虽声明 CMake ≥ 3.16、Qt5 ≥ 5.12，但历史上 `Qt::hex/dec` 需要 Qt ≥ 5.14（现已改为 `QString::number(id, 16)` + `qDebug().noquote()`，在板端 Qt 5.12.8 上实测编译通过），本文的 `ctest --test-dir` 需要 CMake ≥ 3.20；声明的最低版本不代表已验证兼容。[构建预设](../CMakePresets.json) 也需要 CMake ≥ 3.21。本教程用显式 `-S/-B` 命令，统一采用上述推荐版本。
 
 Qt6 开关是 `SMART_COCKPIT_USE_QT6`，最低 6.2。但初学阶段不要同时切换 Qt 版本、编译器和平台，先跑通 Qt5 主线。Windows/macOS 不具备这里的 Linux SocketCAN 和部署环境，不作为本教程的完整运行基线。
 
